@@ -1,0 +1,16 @@
+{
+  "name": "MantSent - Mantle Sentinel",
+  "description": "Telegram-native anomaly intelligence for Mantle wallets.",
+  "capabilities": [
+    "mantle-wallet-monitoring",
+    "mnt-outflow-anomaly-detection",
+    "telegram-alerting",
+    "human-resolved-outcome-recording"
+  ],
+  "service": {
+    "type": "telegram",
+    "endpoint": "https://t.me/MantSentBot"
+  },
+  "proofPage": "https://example.com/agents/1024",
+  "network": "Mantle"
+}

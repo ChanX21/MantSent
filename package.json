@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "preview": "vite --host 0.0.0.0",
+    "env:check": "node scripts/check-env.mjs",
     "check": "node --check app.js"
   },
   "devDependencies": {
