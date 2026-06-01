@@ -46,6 +46,7 @@ async function readJson(req) {
 async function commitPolicy(state) {
   requiredEnv(env, ["MANTSENT_SIGNAL_LEDGER", "DEPLOYER_PRIVATE_KEY", "MANTLE_RPC_URL", "MANTLE_CHAIN_ID"]);
   const watchedWallet = normalizeAddress(state.watchedWallet);
+  const contract = ledger(env);
   const policyHash = digest({
     agentId: state.agentId,
     watchedWallet,
@@ -53,7 +54,9 @@ async function commitPolicy(state) {
     asset: "MNT",
     escalation: "new-recipient",
   });
-  const tx = await ledger(env).commitPolicy(BigInt(state.agentId), policyHash, watchedWallet);
+  const tx = await contract.commitPolicy(BigInt(state.agentId), policyHash, watchedWallet, {
+    nonce: await contract.runner.getNonce("pending"),
+  });
   const receipt = await tx.wait();
   return { policyHash, txHash: receipt.hash };
 }
@@ -61,6 +64,7 @@ async function commitPolicy(state) {
 async function commitAlert(state, evidenceTxHash) {
   requiredEnv(env, ["MANTSENT_SIGNAL_LEDGER", "DEPLOYER_PRIVATE_KEY", "MANTLE_RPC_URL", "MANTLE_CHAIN_ID"]);
   const watchedWallet = normalizeAddress(state.watchedWallet);
+  const contract = ledger(env);
   const alertHash = digest({
     agentId: state.agentId,
     watchedWallet,
@@ -70,12 +74,13 @@ async function commitAlert(state, evidenceTxHash) {
     recipientFirstSeen: true,
     severity: "CRITICAL",
   });
-  const tx = await ledger(env).commitAlert(
+  const tx = await contract.commitAlert(
     BigInt(state.agentId),
     alertHash,
     watchedWallet,
     bytes32TxHash(evidenceTxHash),
     3,
+    { nonce: await contract.runner.getNonce("pending") },
   );
   const receipt = await tx.wait();
   return { alertHash, txHash: receipt.hash };
@@ -84,12 +89,15 @@ async function commitAlert(state, evidenceTxHash) {
 async function commitOutcome(state, label) {
   requiredEnv(env, ["MANTSENT_SIGNAL_LEDGER", "DEPLOYER_PRIVATE_KEY", "MANTLE_RPC_URL", "MANTLE_CHAIN_ID"]);
   const outcome = label === "Suspicious Activity" ? 2 : 1;
+  const contract = ledger(env);
   const feedbackHash = digest({
     alertHash: state.lastAlertHash,
     outcome: label,
     source: "telegram-operator",
   });
-  const tx = await ledger(env).recordOutcome(BigInt(state.agentId), state.lastAlertHash, outcome, feedbackHash);
+  const tx = await contract.recordOutcome(BigInt(state.agentId), state.lastAlertHash, outcome, feedbackHash, {
+    nonce: await contract.runner.getNonce("pending"),
+  });
   const receipt = await tx.wait();
   return { feedbackHash, txHash: receipt.hash };
 }
@@ -113,6 +121,8 @@ async function apiAction(action, payload = {}) {
   }
 
   if (action === "policy") {
+    const current = publicState();
+    if (current.policyActive && current.policyTxHash) return current;
     const threshold = Number(String(payload.text || "").match(/(\d+(?:\.\d+)?)\s*MNT/i)?.[1] ?? 10);
     const before = mutateState((state) => {
       state.thresholdMnt = threshold;
@@ -127,6 +137,8 @@ async function apiAction(action, payload = {}) {
   }
 
   if (action === "transfer") {
+    const current = publicState();
+    if (current.transferDetected && current.alertTxHash && !payload.force) return current;
     const evidenceTxHash = payload.evidenceTxHash || digest({ demo: "controlled-mnt-outflow", at: Date.now() });
     const before = mutateState((state) => {
       state.evidenceTxHash = evidenceTxHash;
@@ -150,6 +162,8 @@ async function apiAction(action, payload = {}) {
   }
 
   if (action === "expected" || action === "suspicious") {
+    const current = publicState();
+    if (current.resolved && current.outcomeTxHash) return current;
     const label = action === "suspicious" ? "Suspicious Activity" : "Expected Transfer";
     const before = publicState();
     const proof = await commitOutcome({ ...before, lastAlertHash: mutateState((s) => s).lastAlertHash }, label);
@@ -239,7 +253,7 @@ async function handleTelegram(update) {
   if (callback) {
     const data = callback.data;
     await telegram("answerCallbackQuery", { callback_query_id: callback.id });
-    if (data === "watch_demo") await apiAction("watch", { address: "0x7F2c2fBb1D2E4B6E6F8E45B902399d8A3c02A91e" });
+    if (data === "watch_demo") await apiAction("watch", { address: "0x7f2c2fbb1d2e4b6e6f8e45b902399d8a3c02a91e" });
     else if (data === "policy_demo") await apiAction("policy", { text: "Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new." });
     else if (data === "transfer_demo") await apiAction("transfer", {});
     else if (data === "proof") await sendStatus(chatId);

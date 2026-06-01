@@ -19,8 +19,8 @@ if (missing.length) {
   process.exit(1);
 }
 
-if (!/^0x[a-fA-F0-9]{64}$/.test(env.DEPLOYER_PRIVATE_KEY)) {
-  console.error("DEPLOYER_PRIVATE_KEY must be a 0x-prefixed 32-byte private key.");
+if (!/^(0x)?[a-fA-F0-9]{64}$/.test(env.DEPLOYER_PRIVATE_KEY)) {
+  console.error("DEPLOYER_PRIVATE_KEY must be a 32-byte private key, with or without 0x prefix.");
   process.exit(1);
 }
 

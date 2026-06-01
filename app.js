@@ -90,7 +90,7 @@ async function loadRemoteState() {
 
 async function callAction(action) {
   const body = { action };
-  if (action === "watch") body.address = "0x7F2c2fBb1D2E4B6E6F8E45B902399d8A3c02A91e";
+  if (action === "watch") body.address = "0x7f2c2fbb1d2e4b6e6f8e45b902399d8a3c02a91e";
   if (action === "policy") body.text = "Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.";
   const response = await fetch("api/action", {
     method: "POST",
