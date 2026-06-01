@@ -1,0 +1,6 @@
+{
+  "chainId": 5003,
+  "network": "Mantle Sepolia",
+  "MantSentSignalLedger": "0x727D5784C001808D39C5c4a85Cb27BcE748Ae879",
+  "deploymentTxHash": "0x9ddfcdf727d6dac60552ee033d3471e1d81e0651059c33a1b658f0f87e2a29b4"
+}

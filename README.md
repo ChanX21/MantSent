@@ -27,6 +27,28 @@ Secrets are intentionally excluded from git. `DEPLOYER_PRIVATE_KEY` must stay lo
 - `contracts/MantSentSignalLedger.sol` emits `PolicyCommitted`, `AlertCommitted`, and `OutcomeRecorded`.
 - `agent-metadata.json` is the ERC-8004 agent metadata shape to publish and reference from the Identity Registry.
 - `.env.example` defaults to Mantle Sepolia chain id `5003` and the PRD-provided ERC-8004 testnet registry addresses.
+- Mantle Sepolia deployment: `0x727D5784C001808D39C5c4a85Cb27BcE748Ae879`.
+
+## Telegram
+
+Run the app and Telegram service together:
+
+```sh
+npm run dev
+```
+
+Then message the bot configured by `TELEGRAM_BOT_TOKEN`:
+
+```text
+/start
+/create
+/watch 0xYourMantleWallet
+/policy Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.
+/simulate
+/proof
+```
+
+Inline buttons are also available for the same golden path. `/simulate` commits a demo `AlertCommitted` proof to Mantle; the browser buttons use the same backend.
 
 ## Product Flow
 
