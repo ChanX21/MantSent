@@ -1,13 +1,15 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import type { RuntimeEnv } from "../../shared/types.js";
 
-export function loadEnv(path = ".env") {
-  const parsed = {};
+export function loadEnv(path = ".env"): RuntimeEnv {
+  const parsed: RuntimeEnv = {};
   if (existsSync(path)) {
-    const lines = readFileSync(path, "utf8").split(/\r?\n/);
-    for (const line of lines) {
+    for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
-      const [key, ...rest] = trimmed.split("=");
+      const [rawKey, ...rest] = trimmed.split("=");
+      const key = rawKey?.trim();
+      if (!key) continue;
       parsed[key] = rest.join("=").trim();
       process.env[key] ??= parsed[key];
     }
@@ -15,7 +17,7 @@ export function loadEnv(path = ".env") {
   return { ...parsed, ...process.env };
 }
 
-export function updateEnvValue(key, value, path = ".env") {
+export function updateEnvValue(key: string, value: string, path = ".env"): void {
   const existing = existsSync(path) ? readFileSync(path, "utf8") : "";
   const line = `${key}=${value}`;
   const next = existing.match(new RegExp(`^${key}=`, "m"))
@@ -25,9 +27,7 @@ export function updateEnvValue(key, value, path = ".env") {
   writeFileSync(path, next.endsWith("\n") ? next : `${next}\n`);
 }
 
-export function requiredEnv(env, keys) {
+export function requiredEnv(env: RuntimeEnv, keys: string[]): asserts env is RuntimeEnv {
   const missing = keys.filter((key) => !env[key] || String(env[key]).trim() === "");
-  if (missing.length) {
-    throw new Error(`Missing environment values: ${missing.join(", ")}`);
-  }
+  if (missing.length) throw new Error(`Missing environment values: ${missing.join(", ")}`);
 }

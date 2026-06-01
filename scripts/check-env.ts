@@ -1,4 +1,4 @@
-import { loadEnv } from "../lib/env.mjs";
+import { loadEnv } from "../src/server/config/env.js";
 
 const env = loadEnv();
 
@@ -19,7 +19,7 @@ if (missing.length) {
   process.exit(1);
 }
 
-if (!/^(0x)?[a-fA-F0-9]{64}$/.test(env.DEPLOYER_PRIVATE_KEY)) {
+if (!/^(0x)?[a-fA-F0-9]{64}$/.test(String(env.DEPLOYER_PRIVATE_KEY))) {
   console.error("DEPLOYER_PRIVATE_KEY must be a 32-byte private key, with or without 0x prefix.");
   process.exit(1);
 }

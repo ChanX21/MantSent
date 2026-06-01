@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-The UI is dependency-light and can also be opened from `index.html` for quick review. Vite is included for normal local development.
+The browser bundle is generated from TypeScript with `npm run build:client`. `npm run dev` builds the client once and starts the TypeScript server.
 
 ## Environment
 
@@ -58,6 +58,25 @@ Inline buttons are also available for the same golden path. `/simulate` commits 
 4. Trigger a controlled MNT transfer.
 5. Resolve the alert as expected or suspicious.
 6. Show the passport page with the identity, policy, alert, and outcome proof trail.
+
+## Project Map
+
+The code is split by operational responsibility so a future change can be assigned and reviewed without crossing unrelated surfaces.
+
+| Area | Files | Owns |
+| --- | --- | --- |
+| Server composition | `src/server/main.ts` | Starts HTTP, Telegram polling, env bootstrap, and dependency wiring. |
+| Product actions | `src/server/actions/action-service.ts` | Create/watch/policy/alert/outcome/reset workflows. |
+| Mantle proofs | `src/server/chain/proofs.ts`, `src/server/chain/mantle.ts` | Ledger contract calls, hashing, address normalization, provider/signer setup. |
+| Telegram adapter | `src/server/telegram/telegram-service.ts` | Commands, inline buttons, polling, and Telegram API calls. |
+| HTTP adapter | `src/server/http/request-handler.ts` | `/api/state`, `/api/action`, webhook route, static file serving. |
+| Persistence | `src/server/state/store.ts` | Local JSON state and public state projection. |
+| Shared contracts | `src/shared/types.ts` | Cross-surface state, action, incident, and env types. |
+| Frontend state/API | `src/client/state.ts`, `src/client/api.ts` | Browser state sync and backend action calls. |
+| Frontend presentation | `src/client/views.ts`, `src/client/components.ts`, `src/client/render.ts`, `styles.css` | Command, Passport, Evidence UI and layout. |
+| Deployment tooling | `scripts/deploy-ledger.ts`, `deployments/` | Contract deployment and recorded deployed addresses. |
+
+Debug from the boundary first: frontend issues start at `src/client/api.ts`; Telegram issues start at `src/server/telegram/telegram-service.ts`; proof transaction issues start at `src/server/actions/action-service.ts` and then `src/server/chain/proofs.ts`.
 
 ## Guardrails
 

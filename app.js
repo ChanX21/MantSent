@@ -1,6 +1,5 @@
-const app = document.querySelector("#app");
-
-const state = {
+// src/client/state.ts
+var state = {
   agentCreated: false,
   walletWatched: false,
   policyActive: false,
@@ -8,102 +7,49 @@ const state = {
   resolved: false,
   outcome: "Unresolved",
   activeView: "command",
-  online: false,
+  online: false
 };
-
-const agent = {
+var agent = {
   id: "1024",
   wallet: "",
   recipient: "",
   tx: "",
   policyTx: "",
   alertTx: "",
-  outcomeTx: "",
+  outcomeTx: ""
 };
-
-const steps = [
+var steps = [
   {
     key: "agentCreated",
     title: "ERC-8004 agent",
     proof: "IdentityRegistry",
-    detail: "MantSent Treasury Anomaly Monitor registered on Mantle testnet.",
+    detail: () => "MantSent Treasury Anomaly Monitor registered on Mantle testnet."
   },
   {
     key: "walletWatched",
     title: "Mantle wallet",
     proof: "Watch active",
-    detail: `${agent.wallet} is pinned to the agent policy scope.`,
+    detail: () => `${agent.wallet || "Watched wallet"} is pinned to the agent policy scope.`
   },
   {
     key: "policyActive",
     title: "Policy committed",
     proof: "PolicyCommitted",
-    detail: "Alert for MNT outflows greater than 10 to first-seen recipients.",
+    detail: () => "Alert for MNT outflows greater than 10 to first-seen recipients."
   },
   {
     key: "transferDetected",
     title: "Critical alert",
     proof: "AlertCommitted",
-    detail: "25 MNT left the watched wallet for a first-seen recipient.",
+    detail: () => "25 MNT left the watched wallet for a first-seen recipient."
   },
   {
     key: "resolved",
     title: "Human outcome",
     proof: "OutcomeRecorded",
-    detail: "Operator label is attached to the alert hash.",
-  },
-];
-
-function cls(flag) {
-  return flag ? "is-on" : "";
-}
-
-function progress() {
-  const complete = steps.filter((step) => state[step.key]).length;
-  return Math.round((complete / steps.length) * 100);
-}
-
-function runAction(action) {
-  callAction(action).catch((error) => showError(error.message));
-}
-
-function setView(view) {
-  state.activeView = view;
-  render();
-}
-
-function gate(flag) {
-  return flag ? "" : "disabled";
-}
-
-async function loadRemoteState() {
-  try {
-    const response = await fetch("api/state");
-    if (!response.ok) throw new Error("backend unavailable");
-    applyRemoteState(await response.json());
-    state.online = true;
-  } catch {
-    state.online = false;
+    detail: () => "Operator label is attached to the alert hash."
   }
-  render();
-}
-
-async function callAction(action) {
-  const body = { action };
-  if (action === "watch") body.address = "0x7f2c2fbb1d2e4b6e6f8e45b902399d8a3c02a91e";
-  if (action === "policy") body.text = "Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.";
-  const response = await fetch("api/action", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const payload = await response.json();
-  if (!response.ok) throw new Error(payload.error || "Action failed");
-  applyRemoteState(payload);
-  state.online = true;
-  render();
-}
-
+];
 function applyRemoteState(remote) {
   Object.assign(state, {
     agentCreated: remote.agentCreated,
@@ -111,7 +57,7 @@ function applyRemoteState(remote) {
     policyActive: remote.policyActive,
     transferDetected: remote.transferDetected,
     resolved: remote.resolved,
-    outcome: remote.outcome,
+    outcome: remote.outcome
   });
   Object.assign(agent, {
     id: remote.agentId || agent.id,
@@ -120,18 +66,80 @@ function applyRemoteState(remote) {
     tx: remote.evidenceTxHash || "",
     policyTx: remote.policyTxHash || "",
     alertTx: remote.alertTxHash || "",
-    outcomeTx: remote.outcomeTxHash || "",
+    outcomeTx: remote.outcomeTxHash || ""
   });
 }
-
-function showError(message) {
-  const toast = document.createElement("div");
-  toast.className = "toast";
-  toast.textContent = message;
-  document.body.append(toast);
-  setTimeout(() => toast.remove(), 5200);
+function progress() {
+  const complete = steps.filter((step) => state[step.key]).length;
+  return Math.round(complete / steps.length * 100);
 }
 
+// src/client/format.ts
+function cls(flag) {
+  return flag ? "is-on" : "";
+}
+function gate(flag) {
+  return flag ? "" : "disabled";
+}
+function short(hash) {
+  if (!hash || hash.length < 18) return hash;
+  return `${hash.slice(0, 10)}...${hash.slice(-8)}`;
+}
+
+// src/client/components.ts
+function chatLine(kind, text, meta = []) {
+  return `
+    <div class="chat-line ${kind}">
+      <div class="bubble">
+        <p>${text}</p>
+        ${meta.length ? `<ul>${meta.map((item) => `<li>${item}</li>`).join("")}</ul>` : ""}
+      </div>
+    </div>
+  `;
+}
+function alertCard() {
+  return `
+    <div class="alert-card">
+      <div class="alert-top">
+        <span>CRITICAL MANTLE TREASURY ALERT</span>
+        <strong>25 MNT</strong>
+      </div>
+      <p>Large outflow to a first-seen recipient may indicate an unauthorized payout or compromised signer action.</p>
+      <div class="alert-facts">
+        <span>Recipient ${agent.recipient}</span>
+        <span>Policy >10 MNT + new recipient</span>
+        <span>Evidence ${short(agent.tx)}</span>
+      </div>
+      <div class="alert-actions">
+        <button data-action="expected" ${gate(state.transferDetected)}>Expected Transfer</button>
+        <button data-action="suspicious" ${gate(state.transferDetected)}>Suspicious Activity</button>
+        <button data-view="passport">View Proof</button>
+      </div>
+    </div>
+  `;
+}
+function actionButton(action, label, enabled) {
+  return `<button class="action-button" data-action="${action}" ${enabled ? "" : "disabled"}>${label}</button>`;
+}
+function metric(label, value) {
+  return `
+    <div class="metric">
+      <span>${label}</span>
+      <strong>${value}</strong>
+    </div>
+  `;
+}
+function proofCard(title, label, done, value) {
+  return `
+    <article class="proof-card ${done ? "done" : ""}">
+      <span>${title}</span>
+      <h3>${label}</h3>
+      <code>${done ? value : "Pending"}</code>
+    </article>
+  `;
+}
+
+// src/client/views.ts
 function commandView() {
   return `
     <section class="workspace">
@@ -145,7 +153,7 @@ function commandView() {
         </div>
         <div class="chat-stack">
           ${chatLine("user", "/create")}
-          ${state.agentCreated ? chatLine("bot", "Your Mantle Sentinel is live.", ["ERC-8004 Agent ID #1024", "Network Mantle Testnet", "Passport ready"]) : ""}
+          ${state.agentCreated ? chatLine("bot", "Your Mantle Sentinel is live.", [`ERC-8004 Agent ID #${agent.id}`, "Network Mantle Testnet", "Passport ready"]) : ""}
           ${state.agentCreated ? chatLine("user", `/watch ${agent.wallet || "0xTreasuryWallet"}`) : ""}
           ${state.walletWatched ? chatLine("bot", "Watching this Mantle wallet.", ["Set a risk rule with /policy"]) : ""}
           ${state.walletWatched ? chatLine("user", "/policy Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.") : ""}
@@ -162,21 +170,20 @@ function commandView() {
         </div>
         <div class="progress-track"><span style="width:${progress()}%"></span></div>
         <div class="action-grid">
-          ${actionButton("create", "Create Agent", "", true)}
-          ${actionButton("watch", "Watch Wallet", "agentCreated", state.agentCreated)}
-          ${actionButton("policy", "Commit Policy", "walletWatched", state.walletWatched)}
-          ${actionButton("transfer", "Trigger MNT Outflow", "policyActive", state.policyActive)}
+          ${actionButton("create", "Create Agent", true)}
+          ${actionButton("watch", "Watch Wallet", state.agentCreated)}
+          ${actionButton("policy", "Commit Policy", state.walletWatched)}
+          ${actionButton("transfer", "Trigger MNT Outflow", state.policyActive)}
         </div>
         <div class="resolve-row">
-          ${actionButton("expected", "Expected", "transferDetected", state.transferDetected)}
-          ${actionButton("suspicious", "Suspicious", "transferDetected", state.transferDetected)}
+          ${actionButton("expected", "Expected", state.transferDetected)}
+          ${actionButton("suspicious", "Suspicious", state.transferDetected)}
         </div>
         <button class="ghost-button" data-action="reset">Reset demo state</button>
       </aside>
     </section>
   `;
 }
-
 function passportView() {
   const alerts = state.transferDetected ? 1 : 0;
   const resolved = state.resolved ? 1 : 0;
@@ -215,7 +222,6 @@ function passportView() {
     </section>
   `;
 }
-
 function evidenceView() {
   return `
     <section class="evidence-grid">
@@ -228,53 +234,6 @@ function evidenceView() {
     </section>
   `;
 }
-
-function chatLine(kind, text, meta = []) {
-  return `
-    <div class="chat-line ${kind}">
-      <div class="bubble">
-        <p>${text}</p>
-        ${meta.length ? `<ul>${meta.map((item) => `<li>${item}</li>`).join("")}</ul>` : ""}
-      </div>
-    </div>
-  `;
-}
-
-function alertCard() {
-  return `
-    <div class="alert-card">
-      <div class="alert-top">
-        <span>CRITICAL MANTLE TREASURY ALERT</span>
-        <strong>25 MNT</strong>
-      </div>
-      <p>Large outflow to a first-seen recipient may indicate an unauthorized payout or compromised signer action.</p>
-      <div class="alert-facts">
-        <span>Recipient ${agent.recipient}</span>
-        <span>Policy >10 MNT + new recipient</span>
-        <span>Evidence ${short(agent.tx)}</span>
-      </div>
-      <div class="alert-actions">
-        <button data-action="expected" ${gate(state.transferDetected)}>Expected Transfer</button>
-        <button data-action="suspicious" ${gate(state.transferDetected)}>Suspicious Activity</button>
-        <button data-view="passport">View Proof</button>
-      </div>
-    </div>
-  `;
-}
-
-function actionButton(action, label, _requires, enabled) {
-  return `<button class="action-button" data-action="${action}" ${enabled ? "" : "disabled"}>${label}</button>`;
-}
-
-function metric(label, value) {
-  return `
-    <div class="metric">
-      <span>${label}</span>
-      <strong>${value}</strong>
-    </div>
-  `;
-}
-
 function timelineItem(step) {
   const done = state[step.key];
   return `
@@ -285,36 +244,19 @@ function timelineItem(step) {
           <strong>${step.title}</strong>
           <small>${done ? step.proof : "Pending"}</small>
         </div>
-        <p>${step.detail}</p>
+        <p>${step.detail()}</p>
       </div>
     </article>
   `;
 }
 
-function proofCard(title, label, done, value) {
-  return `
-    <article class="proof-card ${done ? "done" : ""}">
-      <span>${title}</span>
-      <h3>${label}</h3>
-      <code>${done ? value : "Pending"}</code>
-    </article>
-  `;
-}
-
-function short(hash) {
-  if (!hash || hash.length < 18) return hash;
-  return `${hash.slice(0, 10)}...${hash.slice(-8)}`;
-}
-
+// src/client/render.ts
+var app = document.querySelector("#app");
+if (!app) throw new Error("Missing #app mount node");
+var mount = app;
 function render() {
-  const view =
-    state.activeView === "passport"
-      ? passportView()
-      : state.activeView === "evidence"
-        ? evidenceView()
-        : commandView();
-
-  app.innerHTML = `
+  const view = state.activeView === "passport" ? passportView() : state.activeView === "evidence" ? evidenceView() : commandView();
+  mount.innerHTML = `
     <div class="app-shell">
       <header class="topbar">
         <div class="brand">
@@ -348,13 +290,62 @@ function render() {
     </div>
   `;
 }
+function setView(view) {
+  state.activeView = view;
+  render();
+}
 
-app.addEventListener("click", (event) => {
-  const action = event.target.closest("[data-action]")?.dataset.action;
-  const view = event.target.closest("[data-view]")?.dataset.view;
+// src/client/toast.ts
+function showError(message) {
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  toast.textContent = message;
+  document.body.append(toast);
+  setTimeout(() => toast.remove(), 5200);
+}
+
+// src/client/api.ts
+var demoWallet = "0x7f2c2fbb1d2e4b6e6f8e45b902399d8a3c02a91e";
+var demoPolicy = "Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.";
+async function loadRemoteState() {
+  try {
+    const response = await fetch("api/state");
+    if (!response.ok) throw new Error("backend unavailable");
+    applyRemoteState(await response.json());
+    state.online = true;
+  } catch {
+    state.online = false;
+  }
+  render();
+}
+async function callAction(action) {
+  const body = { action };
+  if (action === "watch") body.address = demoWallet;
+  if (action === "policy") body.text = demoPolicy;
+  const response = await fetch("api/action", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error || "Action failed");
+  applyRemoteState(payload);
+  state.online = true;
+  render();
+}
+function runAction(action) {
+  callAction(action).catch((error) => showError(error.message));
+}
+
+// src/client/main.ts
+document.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const action = target.closest("[data-action]")?.dataset.action;
+  const view = target.closest("[data-view]")?.dataset.view;
   if (action) runAction(action);
   if (view) setView(view);
 });
-
 loadRemoteState();
-setInterval(loadRemoteState, 6000);
+setInterval(loadRemoteState, 6e3);
+//# sourceMappingURL=app.js.map
