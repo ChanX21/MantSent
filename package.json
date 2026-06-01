@@ -3,11 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "description": "MantSent - Mantle Sentinel proof/passport app for Mantle wallet anomaly alerts.",
+  "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
+    "dev": "node server.mjs",
+    "static": "vite --host 0.0.0.0",
     "preview": "vite --host 0.0.0.0",
+    "deploy:ledger": "node scripts/deploy-ledger.mjs",
     "env:check": "node scripts/check-env.mjs",
-    "check": "node --check app.js"
+    "check": "node --check app.js && node --check server.mjs && node --check scripts/check-env.mjs && node --check scripts/deploy-ledger.mjs"
+  },
+  "dependencies": {
+    "ethers": "^6.14.4",
+    "solc": "^0.8.30"
   },
   "devDependencies": {
     "vite": "^6.0.0"

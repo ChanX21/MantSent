@@ -8,16 +8,17 @@ const state = {
   resolved: false,
   outcome: "Unresolved",
   activeView: "command",
+  online: false,
 };
 
 const agent = {
   id: "1024",
-  wallet: "0x7F2c...A91e",
-  recipient: "0x48b9...F0C2",
-  tx: "0x8ac6d1d9e17b7a8e6d40e1a6e7e8e4e85bc15210b7e4b2d2b6d4b0f5af9c1182",
-  policyTx: "0x1357c9a4f56b77821d7e02291be4ac1c9e49b32918e60fb32d742cd17e947910",
-  alertTx: "0xa5105c3a7d2c4a97edc7e93d02233dd456833cfe99e7d6210df728f7c4a18118",
-  outcomeTx: "0xdeb7a83d28e62f5d8f3df941b16be5a7e62b431e02cf7e732e04016fd53e4f9c",
+  wallet: "",
+  recipient: "",
+  tx: "",
+  policyTx: "",
+  alertTx: "",
+  outcomeTx: "",
 };
 
 const steps = [
@@ -63,30 +64,7 @@ function progress() {
 }
 
 function runAction(action) {
-  if (action === "create") state.agentCreated = true;
-  if (action === "watch" && state.agentCreated) state.walletWatched = true;
-  if (action === "policy" && state.walletWatched) state.policyActive = true;
-  if (action === "transfer" && state.policyActive) state.transferDetected = true;
-  if (action === "expected" && state.transferDetected) {
-    state.resolved = true;
-    state.outcome = "Expected Transfer";
-  }
-  if (action === "suspicious" && state.transferDetected) {
-    state.resolved = true;
-    state.outcome = "Suspicious Activity";
-  }
-  if (action === "reset") {
-    Object.assign(state, {
-      agentCreated: false,
-      walletWatched: false,
-      policyActive: false,
-      transferDetected: false,
-      resolved: false,
-      outcome: "Unresolved",
-      activeView: "command",
-    });
-  }
-  render();
+  callAction(action).catch((error) => showError(error.message));
 }
 
 function setView(view) {
@@ -98,6 +76,62 @@ function gate(flag) {
   return flag ? "" : "disabled";
 }
 
+async function loadRemoteState() {
+  try {
+    const response = await fetch("api/state");
+    if (!response.ok) throw new Error("backend unavailable");
+    applyRemoteState(await response.json());
+    state.online = true;
+  } catch {
+    state.online = false;
+  }
+  render();
+}
+
+async function callAction(action) {
+  const body = { action };
+  if (action === "watch") body.address = "0x7F2c2fBb1D2E4B6E6F8E45B902399d8A3c02A91e";
+  if (action === "policy") body.text = "Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.";
+  const response = await fetch("api/action", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error || "Action failed");
+  applyRemoteState(payload);
+  state.online = true;
+  render();
+}
+
+function applyRemoteState(remote) {
+  Object.assign(state, {
+    agentCreated: remote.agentCreated,
+    walletWatched: remote.walletWatched,
+    policyActive: remote.policyActive,
+    transferDetected: remote.transferDetected,
+    resolved: remote.resolved,
+    outcome: remote.outcome,
+  });
+  Object.assign(agent, {
+    id: remote.agentId || agent.id,
+    wallet: remote.watchedWallet || "",
+    recipient: remote.recipient || "",
+    tx: remote.evidenceTxHash || "",
+    policyTx: remote.policyTxHash || "",
+    alertTx: remote.alertTxHash || "",
+    outcomeTx: remote.outcomeTxHash || "",
+  });
+}
+
+function showError(message) {
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  toast.textContent = message;
+  document.body.append(toast);
+  setTimeout(() => toast.remove(), 5200);
+}
+
 function commandView() {
   return `
     <section class="workspace">
@@ -107,12 +141,12 @@ function commandView() {
             <span class="eyebrow">Telegram runtime</span>
             <h2>MantSent command loop</h2>
           </div>
-          <span class="pill ${cls(state.agentCreated)}">Mantle ${state.agentCreated ? "online" : "pending"}</span>
+          <span class="pill ${cls(state.online)}">Backend ${state.online ? "online" : "offline"}</span>
         </div>
         <div class="chat-stack">
           ${chatLine("user", "/create")}
           ${state.agentCreated ? chatLine("bot", "Your Mantle Sentinel is live.", ["ERC-8004 Agent ID #1024", "Network Mantle Testnet", "Passport ready"]) : ""}
-          ${state.agentCreated ? chatLine("user", `/watch ${agent.wallet}`) : ""}
+          ${state.agentCreated ? chatLine("user", `/watch ${agent.wallet || "0xTreasuryWallet"}`) : ""}
           ${state.walletWatched ? chatLine("bot", "Watching this Mantle wallet.", ["Set a risk rule with /policy"]) : ""}
           ${state.walletWatched ? chatLine("user", "/policy Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.") : ""}
           ${state.policyActive ? chatLine("bot", "Policy active on Mantle.", ["Asset MNT", "Trigger outflow greater than 10 MNT", "Escalation new recipient = Critical", `Proof ${short(agent.policyTx)}`]) : ""}
@@ -185,7 +219,7 @@ function passportView() {
 function evidenceView() {
   return `
     <section class="evidence-grid">
-      ${proofCard("Identity Registry", "ERC-8004 Agent ID", state.agentCreated, "agentURI ipfs://mantsent/1024")}
+      ${proofCard("Identity Registry", "ERC-8004 Agent ID", state.agentCreated, `agentURI ipfs://mantsent/${agent.id}`)}
       ${proofCard("Signal Ledger", "PolicyCommitted", state.policyActive, agent.policyTx)}
       ${proofCard("Mantle Evidence", "Native MNT transfer", state.transferDetected, agent.tx)}
       ${proofCard("Signal Ledger", "AlertCommitted", state.transferDetected, agent.alertTx)}
@@ -297,7 +331,7 @@ function render() {
         </nav>
         <div class="network-chip">
           <span></span>
-          Mantle Testnet
+          ${state.online ? "Service Online" : "Static Preview"}
         </div>
       </header>
       <section class="hero-band">
@@ -322,4 +356,5 @@ app.addEventListener("click", (event) => {
   if (view) setView(view);
 });
 
-render();
+loadRemoteState();
+setInterval(loadRemoteState, 6000);

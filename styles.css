@@ -529,6 +529,21 @@ code {
   margin: 20px 0 14px;
 }
 
+.toast {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 20;
+  max-width: min(420px, calc(100vw - 36px));
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 107, 107, 0.45);
+  border-radius: 8px;
+  background: rgba(52, 15, 18, 0.94);
+  color: #fff5f5;
+  box-shadow: var(--shadow);
+  animation: rise 220ms ease both;
+}
+
 @keyframes rise {
   from {
     opacity: 0;
