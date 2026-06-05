@@ -48,6 +48,15 @@ export function metric(label: string, value: number): string {
   `;
 }
 
+export function statusBadge(label: string, value: string, tone: "good" | "warn" | "neutral" = "neutral"): string {
+  return `
+    <div class="status-badge ${tone}">
+      <span>${label}</span>
+      <strong>${value}</strong>
+    </div>
+  `;
+}
+
 export function proofCard(title: string, label: string, done: boolean, value: string, linked = true): string {
   return `
     <article class="proof-card ${done ? "done" : ""}">

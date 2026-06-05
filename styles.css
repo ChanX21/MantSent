@@ -436,6 +436,47 @@ h3 {
   margin-top: 18px;
 }
 
+.status-stack,
+.auth-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.auth-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 0;
+}
+
+.status-badge {
+  display: grid;
+  gap: 4px;
+  min-height: 64px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.status-badge span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.status-badge strong {
+  font-size: 0.95rem;
+}
+
+.status-badge.good {
+  border-color: rgba(23, 199, 132, 0.4);
+  background: rgba(23, 199, 132, 0.08);
+}
+
+.status-badge.warn {
+  border-color: rgba(255, 200, 87, 0.36);
+  background: rgba(255, 200, 87, 0.07);
+}
+
 .ghost-button {
   width: 100%;
   margin-top: 18px;
@@ -625,7 +666,8 @@ code {
   }
 
   .metric-grid,
-  .evidence-grid {
+  .evidence-grid,
+  .auth-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -653,7 +695,8 @@ code {
   }
 
   .metric-grid,
-  .evidence-grid {
+  .evidence-grid,
+  .auth-grid {
     grid-template-columns: 1fr;
   }
 

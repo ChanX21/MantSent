@@ -156,6 +156,14 @@ function metric(label, value) {
     </div>
   `;
 }
+function statusBadge(label, value, tone = "neutral") {
+  return `
+    <div class="status-badge ${tone}">
+      <span>${label}</span>
+      <strong>${value}</strong>
+    </div>
+  `;
+}
 function proofCard(title, label, done, value, linked = true) {
   return `
     <article class="proof-card ${done ? "done" : ""}">
@@ -183,7 +191,7 @@ function commandView() {
         </div>
         <div class="chat-stack">
           ${chatLine("user", "/create")}
-          ${state.agentCreated ? chatLine("bot", "Your Mantle Sentinel is live.", [`ERC-8004 Agent ID #${agent.id}`, "Network Mantle Testnet", "Passport ready"]) : ""}
+          ${state.agentCreated ? chatLine("bot", "Your Mantle Sentinel is live.", [`Agent profile #${agent.id}`, agent.identityStatus === "erc8004-registered" ? "ERC-8004 registered" : "Demo identity pending ERC-8004 registration", "Passport ready"]) : ""}
           ${state.agentCreated ? chatLine("user", `/watch ${agent.wallet || "0xTreasuryWallet"}`) : ""}
           ${state.walletWatched ? chatLine("bot", "Watching this Mantle wallet.", ["Set a risk rule with /policy"]) : ""}
           ${state.walletWatched ? chatLine("user", "/policy Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.") : ""}
@@ -199,10 +207,16 @@ function commandView() {
           <span>${progress()}%</span>
         </div>
         <div class="progress-track"><span style="width:${progress()}%"></span></div>
+        <div class="status-stack">
+          ${statusBadge("Identity", agent.identityStatus === "erc8004-registered" ? "ERC-8004" : "Demo profile", agent.identityStatus === "erc8004-registered" ? "good" : "warn")}
+          ${statusBadge("Monitor", state.monitorActive ? "Live polling" : "Off", state.monitorActive ? "good" : "warn")}
+          ${statusBadge("Evidence", agent.evidenceSource === "mantle-transaction" ? "Real tx" : "Demo hash", agent.evidenceSource === "mantle-transaction" ? "good" : "warn")}
+        </div>
         <div class="action-grid">
           ${actionButton("create", "Create Agent", true)}
           ${actionButton("watch", "Watch Wallet", state.agentCreated)}
           ${actionButton("policy", "Commit Policy", state.walletWatched)}
+          ${actionButton("monitor", "Enable Monitor", state.policyActive)}
           ${actionButton("transfer", "Trigger MNT Outflow", state.policyActive)}
         </div>
         <div class="resolve-row">
@@ -239,6 +253,11 @@ function passportView() {
         ${metric("Suspicious", suspicious)}
         ${metric("Expected", expected)}
       </div>
+      <div class="auth-grid">
+        ${statusBadge("Identity status", agent.identityStatus === "erc8004-registered" ? "ERC-8004 registered" : "Demo profile", agent.identityStatus === "erc8004-registered" ? "good" : "warn")}
+        ${statusBadge("Monitor status", state.monitorActive ? "Real Mantle polling" : "Not enabled", state.monitorActive ? "good" : "warn")}
+        ${statusBadge("Evidence source", agent.evidenceSource === "mantle-transaction" ? "Real Mantle transaction" : "Demo/simulated evidence", agent.evidenceSource === "mantle-transaction" ? "good" : "warn")}
+      </div>
       <div class="policy-card">
         <div>
           <span class="eyebrow">Active policy</span>
@@ -255,7 +274,7 @@ function passportView() {
 function evidenceView() {
   return `
     <section class="evidence-grid">
-      ${proofCard("Identity Registry", "ERC-8004 Agent ID", state.agentCreated, `agentURI ipfs://mantsent/${agent.id}`, false)}
+      ${proofCard("Identity Registry", agent.identityStatus === "erc8004-registered" ? "ERC-8004 Agent ID" : "Demo Agent Profile", state.agentCreated, `agentURI ipfs://mantsent/${agent.id}`, false)}
       ${proofCard("Signal Ledger", "PolicyCommitted", state.policyActive, agent.policyTx)}
       ${proofCard("Mantle Evidence", "Evidence hash", state.transferDetected, agent.tx, false)}
       ${proofCard("Signal Ledger", "AlertCommitted", state.transferDetected, agent.alertTx)}
