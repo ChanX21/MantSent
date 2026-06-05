@@ -2,6 +2,7 @@ import type { ActionName, PublicState } from "../../shared/types.js";
 import type { ActionService } from "../actions/action-service.js";
 import { mutateState } from "../state/store.js";
 import { mantleTxUrl } from "../../shared/explorer.js";
+import { defaultMantleLogoUrl, mantleProofTagline, telegramIntroCaption } from "../../shared/branding.js";
 
 const demoWallet = "0x7f2c2fbb1d2e4b6e6f8e45b902399d8a3c02a91e";
 const demoPolicy = "Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.";
@@ -28,7 +29,17 @@ export interface TelegramService {
   sendStatus: (chatId: number) => Promise<void>;
 }
 
-export function createTelegramService({ botToken, actions, chainId }: { botToken?: string; actions: ActionService; chainId?: string }): TelegramService {
+export function createTelegramService({
+  botToken,
+  actions,
+  chainId,
+  mantleLogoUrl = defaultMantleLogoUrl,
+}: {
+  botToken?: string;
+  actions: ActionService;
+  chainId?: string;
+  mantleLogoUrl?: string;
+}): TelegramService {
   async function call<T>(method: string, body: Record<string, unknown>): Promise<T> {
     if (!botToken) throw new Error("TELEGRAM_BOT_TOKEN is not set.");
     const response = await fetch(`https://api.telegram.org/bot${botToken}/${method}`, {
@@ -85,10 +96,7 @@ export function createTelegramService({ botToken, actions, chainId }: { botToken
 
     try {
       if (command === "/start") {
-        await call("sendMessage", {
-          chat_id: chatId,
-          text: "MantSent monitors Mantle wallets, raises MNT anomaly alerts, and records human outcomes on Mantle.",
-        });
+        await sendMantleIntro(chatId);
         await sendStatus(chatId);
       } else if (command === "/create") {
         await actions.run("create");
@@ -135,6 +143,21 @@ export function createTelegramService({ botToken, actions, chainId }: { botToken
   }
 
   return { call, handleUpdate, poll, sendStatus };
+
+  async function sendMantleIntro(chatId: number): Promise<void> {
+    try {
+      await call("sendPhoto", {
+        chat_id: chatId,
+        photo: mantleLogoUrl,
+        caption: telegramIntroCaption,
+      });
+    } catch {
+      await call("sendMessage", {
+        chat_id: chatId,
+        text: telegramIntroCaption,
+      });
+    }
+  }
 }
 
 function rememberChat(chatId: number): void {
@@ -145,7 +168,7 @@ function rememberChat(chatId: number): void {
 
 function statusText(state: PublicState): string {
   const proofs = proofLines(state);
-  return `MantSent on Mantle\nAgent: #${state.agentId}\nWallet: ${state.watchedWallet || "not set"}\nPolicy: ${state.policyActive ? `>${state.thresholdMnt} MNT to new recipient` : "not set"}\nOutcome: ${state.outcome}${proofs ? `\n\nProofs:\n${proofs}` : ""}`;
+  return `MantSent on Mantle\n${mantleProofTagline}\n\nAgent: #${state.agentId}\nWallet: ${state.watchedWallet || "not set"}\nPolicy: ${state.policyActive ? `>${state.thresholdMnt} MNT to new recipient` : "not set"}\nOutcome: ${state.outcome}${proofs ? `\n\nProofs:\n${proofs}` : ""}`;
 }
 
 function proofLines(state: PublicState): string {

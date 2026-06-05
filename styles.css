@@ -112,6 +112,12 @@ a {
   font-weight: 800;
 }
 
+.brand-mark img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
 .brand strong,
 .brand small {
   display: block;

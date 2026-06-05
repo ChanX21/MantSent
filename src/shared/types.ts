@@ -44,6 +44,7 @@ export interface RuntimeEnv {
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_WEBHOOK_SECRET?: string;
   PASSPORT_BASE_URL?: string;
+  MANTLE_LOGO_URL?: string;
   OPENAI_API_KEY?: string;
 }
 

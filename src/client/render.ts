@@ -1,6 +1,7 @@
 import { commandView, evidenceView, passportView } from "./views.js";
 import { progress, state } from "./state.js";
 import type { ViewName } from "./types.js";
+import { defaultMantleLogoUrl, mantleProofTagline } from "../shared/branding.js";
 
 const app = document.querySelector("#app");
 if (!app) throw new Error("Missing #app mount node");
@@ -13,10 +14,12 @@ export function render(): void {
     <div class="app-shell">
       <header class="topbar">
         <div class="brand">
-          <span class="brand-mark">MS</span>
+          <span class="brand-mark">
+            <img src="${defaultMantleLogoUrl}" alt="Mantle logo" />
+          </span>
           <div>
             <strong>MantSent</strong>
-            <small>Mantle Sentinel</small>
+            <small>${mantleProofTagline}</small>
           </div>
         </div>
         <nav class="view-tabs" aria-label="MantSent views">
@@ -26,13 +29,13 @@ export function render(): void {
         </nav>
         <div class="network-chip">
           <span></span>
-          ${state.online ? "Service Online" : "Static Preview"}
+          ${state.online ? "Secured on Mantle" : "Mantle Preview"}
         </div>
       </header>
       <section class="hero-band">
         <div>
           <span class="eyebrow">MNT anomaly intelligence</span>
-          <h1>Mantle treasury alerts with proof that survives the demo.</h1>
+          <h1>Mantle treasury alerts with proof secured on Mantle.</h1>
         </div>
         <div class="hero-proof">
           <small>Verified flow</small>
