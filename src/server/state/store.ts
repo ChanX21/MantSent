@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import type { AppState, PublicState } from "../../shared/types.js";
+import { createAgentProfile } from "../agent/single-wallet-monitoring-agent.js";
 
 const statePath = "data/mantsent-state.json";
 
@@ -12,6 +13,7 @@ const defaultState: AppState = {
   transferDetected: false,
   resolved: false,
   outcome: "Unresolved",
+  agentProfile: createAgentProfile({ MANTLE_CHAIN_ID: "5003" }),
   agentId: "1024",
   watchedWallet: "",
   recipient: "",

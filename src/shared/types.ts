@@ -13,6 +13,22 @@ export interface PolicyRule {
   rawText: string;
 }
 
+export interface MonitoringSkill {
+  id: "single-wallet-mnt-outflow-monitor";
+  name: string;
+  description: string;
+  scope: "one-mantle-address";
+  capabilities: string[];
+}
+
+export interface AgentProfile {
+  id: string;
+  name: string;
+  network: "Mantle Sepolia" | "Mantle Mainnet";
+  identityStatus: AgentIdentityStatus;
+  skill: MonitoringSkill;
+}
+
 export interface Incident {
   evidenceTxHash: string;
   alertTxHash: string;
@@ -22,6 +38,7 @@ export interface Incident {
   recipient: string;
   outflowAmountMnt: string;
   source: EvidenceSource;
+  explanation: string;
   outcomeTxHash?: string;
 }
 
@@ -34,6 +51,7 @@ export interface AppState {
   transferDetected: boolean;
   resolved: boolean;
   outcome: OutcomeLabel;
+  agentProfile: AgentProfile;
   agentId: string;
   watchedWallet: string;
   recipient: string;

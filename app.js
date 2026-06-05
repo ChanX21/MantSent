@@ -20,7 +20,9 @@ var agent = {
   outcomeTx: "",
   chainId: "5003",
   evidenceSource: "demo",
-  identityStatus: "placeholder"
+  identityStatus: "placeholder",
+  skillName: "Single Wallet MNT Outflow Monitor",
+  skillDescription: "Monitors one Mantle address for native MNT outflows against a threshold and recipient novelty policy."
 };
 var steps = [
   {
@@ -66,6 +68,8 @@ function applyRemoteState(remote) {
   });
   Object.assign(agent, {
     id: remote.agentId || agent.id,
+    skillName: remote.agentProfile?.skill.name || agent.skillName,
+    skillDescription: remote.agentProfile?.skill.description || agent.skillDescription,
     wallet: remote.watchedWallet || "",
     recipient: remote.recipient || "",
     tx: remote.evidenceTxHash || "",
@@ -191,7 +195,7 @@ function commandView() {
         </div>
         <div class="chat-stack">
           ${chatLine("user", "/create")}
-          ${state.agentCreated ? chatLine("bot", "Your Mantle Sentinel is live.", [`Agent profile #${agent.id}`, agent.identityStatus === "erc8004-registered" ? "ERC-8004 registered" : "Demo identity pending ERC-8004 registration", "Passport ready"]) : ""}
+          ${state.agentCreated ? chatLine("bot", "Your Mantle Sentinel is live.", [`Agent profile #${agent.id}`, agent.skillName, agent.identityStatus === "erc8004-registered" ? "ERC-8004 registered" : "Demo identity pending ERC-8004 registration", "Passport ready"]) : ""}
           ${state.agentCreated ? chatLine("user", `/watch ${agent.wallet || "0xTreasuryWallet"}`) : ""}
           ${state.walletWatched ? chatLine("bot", "Watching this Mantle wallet.", ["Set a risk rule with /policy"]) : ""}
           ${state.walletWatched ? chatLine("user", "/policy Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.") : ""}
@@ -209,6 +213,7 @@ function commandView() {
         <div class="progress-track"><span style="width:${progress()}%"></span></div>
         <div class="status-stack">
           ${statusBadge("Identity", agent.identityStatus === "erc8004-registered" ? "ERC-8004" : "Demo profile", agent.identityStatus === "erc8004-registered" ? "good" : "warn")}
+          ${statusBadge("Skill", "One wallet", "good")}
           ${statusBadge("Monitor", state.monitorActive ? "Live polling" : "Off", state.monitorActive ? "good" : "warn")}
           ${statusBadge("Evidence", agent.evidenceSource === "mantle-transaction" ? "Real tx" : "Demo hash", agent.evidenceSource === "mantle-transaction" ? "good" : "warn")}
         </div>
@@ -239,7 +244,7 @@ function passportView() {
         <div>
           <span class="eyebrow">Agent passport</span>
           <h2>MantSent #${agent.id}</h2>
-          <p>Treasury Anomaly Monitor anchored to Mantle identity, policy, alert, and outcome proofs.</p>
+          <p>${agent.skillDescription}</p>
         </div>
         <div class="agent-card">
           <span>ERC-8004</span>

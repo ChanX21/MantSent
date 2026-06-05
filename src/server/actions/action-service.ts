@@ -1,8 +1,13 @@
 import type { ActionName, ActionPayload, AppState, OutcomeLabel, PublicState, RuntimeEnv } from "../../shared/types.js";
-import { digest, normalizeAddress } from "../chain/mantle.js";
+import {
+  activateMonitoringPolicy,
+  assignSingleWallet,
+  buildIncident,
+  createAgentProfile,
+  evaluateAgentTransfer,
+} from "../agent/single-wallet-monitoring-agent.js";
+import { digest } from "../chain/mantle.js";
 import { commitAlertProof, commitOutcomeProof, commitPolicyProof } from "../chain/proofs.js";
-import { evaluateTransfer } from "../policy/policy-engine.js";
-import { parsePolicy } from "../policy/policy-parser.js";
 import { mutateState, publicState } from "../state/store.js";
 
 const demoRecipient = "0x48B981747384A90A24ad834DAd6AfaB6D1f0F0C2";
@@ -16,26 +21,27 @@ export function createActionService(env: RuntimeEnv): ActionService {
   return {
     state: publicState,
     async run(action: ActionName, payload: ActionPayload = {}) {
-      if (action === "create") return createAgent();
+      if (action === "create") return createAgent(env);
       if (action === "watch") return watchWallet(payload);
       if (action === "policy") return activatePolicy(env, payload);
       if (action === "transfer") return simulateTransfer(env, payload);
       if (action === "expected" || action === "suspicious") return resolveAlert(env, action);
       if (action === "monitor") return enableMonitor();
-      if (action === "reset") return resetDemo();
+      if (action === "reset") return resetDemo(env);
       throw new Error(`Unknown action: ${action}`);
     },
   };
 }
 
-function createAgent(): AppState {
+function createAgent(env: RuntimeEnv): AppState {
   return mutateState((state) => {
     state.agentCreated = true;
+    state.agentProfile = createAgentProfile(env, state.agentId);
   });
 }
 
 function watchWallet(payload: ActionPayload): AppState {
-  const address = normalizeAddress(payload.address || payload.text || "");
+  const address = assignSingleWallet(payload.address || payload.text || "");
   return mutateState((state) => {
     state.agentCreated = true;
     state.walletWatched = true;
@@ -46,7 +52,7 @@ function watchWallet(payload: ActionPayload): AppState {
 async function activatePolicy(env: RuntimeEnv, payload: ActionPayload): Promise<PublicState> {
   const current = publicState();
   if (current.policyActive && current.policyTxHash) return current;
-  const policy = parsePolicy(payload.text);
+  const policy = activateMonitoringPolicy(payload.text);
 
   const before = mutateState((state) => {
     state.policy = policy;
@@ -64,18 +70,17 @@ async function simulateTransfer(env: RuntimeEnv, payload: ActionPayload): Promis
   const current = publicState();
   if (current.transferDetected && current.alertTxHash && !payload.force) return current;
 
-  const policy = current.policy ?? parsePolicy();
+  const policy = current.policy ?? activateMonitoringPolicy();
   const evidenceTxHash = payload.evidenceTxHash || digest({ demo: "controlled-mnt-outflow", at: Date.now() });
   const recipient = payload.recipient || current.recipient || demoRecipient;
-  const decision = evaluateTransfer(
-    policy,
+  const decision = evaluateAgentTransfer(
+    { ...current, policy },
     {
       hash: evidenceTxHash,
       from: current.watchedWallet,
       to: recipient,
       amountMnt: 25,
     },
-    current.seenRecipients,
   );
 
   if (!decision.shouldAlert) return current;
@@ -96,16 +101,15 @@ async function simulateTransfer(env: RuntimeEnv, payload: ActionPayload): Promis
     state.transferDetected = true;
     state.alertTxHash = proof.txHash;
     state.lastAlertHash = proof.alertHash || "";
-    state.incidents.unshift({
+    state.incidents.unshift(buildIncident({
       evidenceTxHash,
       alertTxHash: proof.txHash,
-      severity: decision.severity,
-      outcome: "Unresolved",
-      createdAt: new Date().toISOString(),
+      decision,
       recipient,
       outflowAmountMnt: "25",
       source: "demo",
-    });
+      thresholdMnt: policy.thresholdMnt,
+    }));
   });
 }
 
@@ -128,7 +132,7 @@ async function resolveAlert(env: RuntimeEnv, action: "expected" | "suspicious"):
   });
 }
 
-function resetDemo(): AppState {
+function resetDemo(env: RuntimeEnv): AppState {
   return mutateState((state) => {
     Object.assign(state, {
       agentCreated: false,
@@ -150,6 +154,7 @@ function resetDemo(): AppState {
       monitorCursorBlock: 0,
       seenRecipients: [],
       incidents: [],
+      agentProfile: createAgentProfile(env, state.agentId),
     });
   });
 }

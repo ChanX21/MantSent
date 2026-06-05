@@ -23,6 +23,8 @@ export interface AgentViewModel {
   chainId: string;
   evidenceSource: PublicState["evidenceSource"];
   identityStatus: PublicState["agentIdentityStatus"];
+  skillName: string;
+  skillDescription: string;
 }
 
 export type ViewName = "command" | "passport" | "evidence";

@@ -23,6 +23,8 @@ export const agent: AgentViewModel = {
   chainId: "5003",
   evidenceSource: "demo",
   identityStatus: "placeholder",
+  skillName: "Single Wallet MNT Outflow Monitor",
+  skillDescription: "Monitors one Mantle address for native MNT outflows against a threshold and recipient novelty policy.",
 };
 
 export const steps: StepViewModel[] = [
@@ -76,6 +78,8 @@ export function applyRemoteState(remote: PublicState): void {
   });
   Object.assign(agent, {
     id: remote.agentId || agent.id,
+    skillName: remote.agentProfile?.skill.name || agent.skillName,
+    skillDescription: remote.agentProfile?.skill.description || agent.skillDescription,
     wallet: remote.watchedWallet || "",
     recipient: remote.recipient || "",
     tx: remote.evidenceTxHash || "",
