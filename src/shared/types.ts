@@ -39,8 +39,11 @@ export interface Incident {
   outflowAmountMnt: string;
   source: EvidenceSource;
   explanation: string;
+  explanationProvider: AiProvider;
   outcomeTxHash?: string;
 }
+
+export type AiProvider = "template" | "openai" | "ollama";
 
 export interface AppState {
   agentCreated: boolean;
@@ -83,7 +86,11 @@ export interface RuntimeEnv {
   TELEGRAM_WEBHOOK_SECRET?: string;
   PASSPORT_BASE_URL?: string;
   MANTLE_LOGO_URL?: string;
+  AI_PROVIDER?: AiProvider;
+  OPENAI_MODEL?: string;
   OPENAI_API_KEY?: string;
+  OLLAMA_BASE_URL?: string;
+  OLLAMA_MODEL?: string;
 }
 
 export type ActionName = "create" | "watch" | "policy" | "transfer" | "expected" | "suspicious" | "reset" | "monitor";

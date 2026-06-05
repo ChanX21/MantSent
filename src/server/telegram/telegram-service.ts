@@ -173,7 +173,8 @@ function rememberChat(chatId: number): void {
 
 function statusText(state: PublicState): string {
   const proofs = proofLines(state);
-  return `MantSent on Mantle\n${mantleProofTagline}\n\nAgent: #${state.agentId}\nSkill: ${state.agentProfile.skill.name}\nScope: one Mantle address\nIdentity: ${state.agentIdentityStatus === "erc8004-registered" ? "ERC-8004 registered" : "demo profile"}\nWallet: ${state.watchedWallet || "not set"}\nPolicy: ${state.policyActive ? `>${state.thresholdMnt} MNT to new recipient` : "not set"}\nMonitor: ${state.monitorActive ? "real Mantle polling enabled" : "off"}\nEvidence: ${state.evidenceSource === "mantle-transaction" ? "real Mantle transaction" : "demo/simulated"}\nOutcome: ${state.outcome}${proofs ? `\n\nProofs:\n${proofs}` : ""}`;
+  const latest = state.incidents[0];
+  return `MantSent on Mantle\n${mantleProofTagline}\n\nAgent: #${state.agentId}\nSkill: ${state.agentProfile.skill.name}\nScope: one Mantle address\nIdentity: ${state.agentIdentityStatus === "erc8004-registered" ? "ERC-8004 registered" : "demo profile"}\nWallet: ${state.watchedWallet || "not set"}\nPolicy: ${state.policyActive ? `>${state.thresholdMnt} MNT to new recipient` : "not set"}\nMonitor: ${state.monitorActive ? "real Mantle polling enabled" : "off"}\nEvidence: ${state.evidenceSource === "mantle-transaction" ? "real Mantle transaction" : "demo/simulated"}\nOutcome: ${state.outcome}${latest ? `\n\nAgent explanation (${latest.explanationProvider}):\n${latest.explanation}` : ""}${proofs ? `\n\nProofs:\n${proofs}` : ""}`;
 }
 
 function proofLines(state: PublicState): string {

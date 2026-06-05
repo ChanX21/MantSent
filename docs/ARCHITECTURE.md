@@ -77,6 +77,18 @@ It owns one watched Mantle address and evaluates native MNT outflows against one
 
 This keeps the agent intelligence easy to test and extend. A future ERC-20 skill, multisig skill, or ERC-8004 identity module should be added beside it instead of being mixed into the Telegram or frontend adapters.
 
+## Agent Explanation Providers
+
+The agent can explain alerts through a small provider interface:
+
+| Provider | Env | Use |
+| --- | --- | --- |
+| Template | `AI_PROVIDER=template` | Default, no API key, deterministic text. |
+| OpenAI | `AI_PROVIDER=openai` + `OPENAI_API_KEY` | Better alert explanations and future richer policy parsing. |
+| Ollama | `AI_PROVIDER=ollama` + local Ollama server | Local/free model mode for users who do not want hosted API calls. |
+
+The provider lives under `src/server/agent/llm/`. It must not decide whether an alert is true. It only explains the result of deterministic policy evaluation.
+
 ## Policy Enforcement
 
 Policy enforcement is deterministic. The parser extracts:

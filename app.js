@@ -8,7 +8,8 @@ var state = {
   resolved: false,
   outcome: "Unresolved",
   activeView: "command",
-  online: false
+  online: false,
+  incidents: []
 };
 var agent = {
   id: "1024",
@@ -64,7 +65,8 @@ function applyRemoteState(remote) {
     monitorActive: remote.monitorActive,
     transferDetected: remote.transferDetected,
     resolved: remote.resolved,
-    outcome: remote.outcome
+    outcome: remote.outcome,
+    incidents: remote.incidents
   });
   Object.assign(agent, {
     id: remote.agentId || agent.id,
@@ -238,6 +240,7 @@ function passportView() {
   const resolved = state.resolved ? 1 : 0;
   const suspicious = state.outcome === "Suspicious Activity" ? 1 : 0;
   const expected = state.outcome === "Expected Transfer" ? 1 : 0;
+  const latestIncident = state.incidents[0];
   return `
     <section class="passport">
       <div class="passport-hero">
@@ -263,6 +266,13 @@ function passportView() {
         ${statusBadge("Monitor status", state.monitorActive ? "Real Mantle polling" : "Not enabled", state.monitorActive ? "good" : "warn")}
         ${statusBadge("Evidence source", agent.evidenceSource === "mantle-transaction" ? "Real Mantle transaction" : "Demo/simulated evidence", agent.evidenceSource === "mantle-transaction" ? "good" : "warn")}
       </div>
+      ${latestIncident ? `<div class="policy-card">
+              <div>
+                <span class="eyebrow">Agent explanation</span>
+                <h3>${latestIncident.explanationProvider} generated</h3>
+                <p>${latestIncident.explanation}</p>
+              </div>
+            </div>` : ""}
       <div class="policy-card">
         <div>
           <span class="eyebrow">Active policy</span>

@@ -10,6 +10,7 @@ export interface ClientState {
   outcome: PublicState["outcome"];
   activeView: ViewName;
   online: boolean;
+  incidents: PublicState["incidents"];
 }
 
 export interface AgentViewModel {

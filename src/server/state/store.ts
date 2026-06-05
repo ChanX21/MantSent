@@ -33,7 +33,18 @@ const defaultState: AppState = {
 
 export function loadState(path = statePath): AppState {
   if (!existsSync(path)) return { ...defaultState };
-  return { ...defaultState, ...JSON.parse(readFileSync(path, "utf8")) };
+  const loaded = { ...defaultState, ...JSON.parse(readFileSync(path, "utf8")) } as AppState;
+  loaded.incidents = loaded.incidents.map((incident) => ({
+    ...incident,
+    explanation:
+      incident.explanation ||
+      `MantSent detected ${incident.outflowAmountMnt || "an"} MNT outflow for the watched wallet. Review signer intent before marking the outcome.`,
+    explanationProvider: incident.explanationProvider || "template",
+    recipient: incident.recipient || loaded.recipient,
+    outflowAmountMnt: incident.outflowAmountMnt || "unknown",
+    source: incident.source || loaded.evidenceSource,
+  }));
+  return loaded;
 }
 
 export function saveState(state: AppState, path = statePath): void {

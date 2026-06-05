@@ -10,6 +10,7 @@ export const state: ClientState = {
   outcome: "Unresolved",
   activeView: "command",
   online: false,
+  incidents: [],
 };
 
 export const agent: AgentViewModel = {
@@ -75,6 +76,7 @@ export function applyRemoteState(remote: PublicState): void {
     transferDetected: remote.transferDetected,
     resolved: remote.resolved,
     outcome: remote.outcome,
+    incidents: remote.incidents,
   });
   Object.assign(agent, {
     id: remote.agentId || agent.id,

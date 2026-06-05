@@ -2,6 +2,7 @@ import type { AgentProfile, AppState, EvidenceSource, Incident, MonitoringSkill,
 import { normalizeAddress } from "../chain/mantle.js";
 import { evaluateTransfer, type PolicyDecision, type TransferCandidate } from "../policy/policy-engine.js";
 import { parsePolicy } from "../policy/policy-parser.js";
+import type { AgentLlmProvider } from "./llm/agent-llm-provider.js";
 
 export const singleWalletMonitoringSkill: MonitoringSkill = {
   id: "single-wallet-mnt-outflow-monitor",
@@ -53,7 +54,7 @@ export function buildAgentExplanation(input: {
   return `MantSent detected ${input.amountMnt} MNT leaving the watched wallet via ${sourcePhrase}. The active policy triggers above ${input.thresholdMnt} MNT, and the recipient is a ${noveltyPhrase}. Review signer intent before marking the outcome.`;
 }
 
-export function buildIncident(input: {
+export async function buildIncident(input: {
   evidenceTxHash: string;
   alertTxHash: string;
   decision: PolicyDecision;
@@ -61,7 +62,18 @@ export function buildIncident(input: {
   outflowAmountMnt: string;
   source: EvidenceSource;
   thresholdMnt: number;
-}): Incident {
+  llm: AgentLlmProvider;
+}): Promise<Incident> {
+  const explanationInput = {
+    amountMnt: input.outflowAmountMnt,
+    recipient: input.recipient,
+    thresholdMnt: input.thresholdMnt,
+    recipientFirstSeen: input.decision.recipientFirstSeen,
+    source: input.source,
+    severity: input.decision.severity,
+    evidenceTxHash: input.evidenceTxHash,
+  };
+
   return {
     evidenceTxHash: input.evidenceTxHash,
     alertTxHash: input.alertTxHash,
@@ -71,12 +83,7 @@ export function buildIncident(input: {
     recipient: input.recipient,
     outflowAmountMnt: input.outflowAmountMnt,
     source: input.source,
-    explanation: buildAgentExplanation({
-      amountMnt: input.outflowAmountMnt,
-      recipient: input.recipient,
-      thresholdMnt: input.thresholdMnt,
-      recipientFirstSeen: input.decision.recipientFirstSeen,
-      source: input.source,
-    }),
+    explanation: await input.llm.explainAlert(explanationInput),
+    explanationProvider: input.llm.id,
   };
 }

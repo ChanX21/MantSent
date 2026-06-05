@@ -8,6 +8,7 @@ import {
 } from "../agent/single-wallet-monitoring-agent.js";
 import { digest } from "../chain/mantle.js";
 import { commitAlertProof, commitOutcomeProof, commitPolicyProof } from "../chain/proofs.js";
+import { createAgentLlmProvider } from "../agent/llm/provider-factory.js";
 import { mutateState, publicState } from "../state/store.js";
 
 const demoRecipient = "0x48B981747384A90A24ad834DAd6AfaB6D1f0F0C2";
@@ -71,6 +72,7 @@ async function simulateTransfer(env: RuntimeEnv, payload: ActionPayload): Promis
   if (current.transferDetected && current.alertTxHash && !payload.force) return current;
 
   const policy = current.policy ?? activateMonitoringPolicy();
+  const llm = createAgentLlmProvider(env);
   const evidenceTxHash = payload.evidenceTxHash || digest({ demo: "controlled-mnt-outflow", at: Date.now() });
   const recipient = payload.recipient || current.recipient || demoRecipient;
   const decision = evaluateAgentTransfer(
@@ -97,19 +99,22 @@ async function simulateTransfer(env: RuntimeEnv, payload: ActionPayload): Promis
     severity: decision.severity,
   });
 
+  const incident = await buildIncident({
+    evidenceTxHash,
+    alertTxHash: proof.txHash,
+    decision,
+    recipient,
+    outflowAmountMnt: "25",
+    source: "demo",
+    thresholdMnt: policy.thresholdMnt,
+    llm,
+  });
+
   return mutateState((state) => {
     state.transferDetected = true;
     state.alertTxHash = proof.txHash;
     state.lastAlertHash = proof.alertHash || "";
-    state.incidents.unshift(buildIncident({
-      evidenceTxHash,
-      alertTxHash: proof.txHash,
-      decision,
-      recipient,
-      outflowAmountMnt: "25",
-      source: "demo",
-      thresholdMnt: policy.thresholdMnt,
-    }));
+    state.incidents.unshift(incident);
   });
 }
 

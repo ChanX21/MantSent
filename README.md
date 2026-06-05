@@ -22,6 +22,30 @@ npm run env:check
 
 Secrets are intentionally excluded from git. `DEPLOYER_PRIVATE_KEY` must stay local or in the deployment provider secret store.
 
+### Agent Explanation Provider
+
+MantSent works without an LLM by default:
+
+```env
+AI_PROVIDER=template
+```
+
+Optional provider modes:
+
+```env
+AI_PROVIDER=openai
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-4.1-mini
+```
+
+```env
+AI_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen3:4b
+```
+
+The LLM only writes short explanations. Policy enforcement and proof writes remain deterministic code.
+
 ## Mantle Proof Surface
 
 - `contracts/MantSentSignalLedger.sol` emits `PolicyCommitted`, `AlertCommitted`, and `OutcomeRecorded`.

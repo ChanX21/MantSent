@@ -1,6 +1,7 @@
 import type { TransactionResponse } from "ethers";
 import type { RuntimeEnv } from "../../shared/types.js";
 import { buildIncident, evaluateAgentTransfer } from "../agent/single-wallet-monitoring-agent.js";
+import { createAgentLlmProvider } from "../agent/llm/provider-factory.js";
 import { formatMnt, normalizeAddress, provider } from "../chain/mantle.js";
 import { commitAlertProof } from "../chain/proofs.js";
 import { parsePolicy } from "../policy/policy-parser.js";
@@ -89,6 +90,17 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse)
     recipientFirstSeen: decision.recipientFirstSeen,
     severity: decision.severity,
   });
+  const llm = createAgentLlmProvider(env);
+  const incident = await buildIncident({
+    evidenceTxHash: tx.hash,
+    alertTxHash: proof.txHash,
+    decision,
+    recipient,
+    outflowAmountMnt: formatMnt(tx.value),
+    source: "mantle-transaction",
+    thresholdMnt: policy.thresholdMnt,
+    llm,
+  });
 
   mutateState((current) => {
     current.transferDetected = true;
@@ -96,14 +108,6 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse)
     current.outcome = "Unresolved";
     current.alertTxHash = proof.txHash;
     current.lastAlertHash = proof.alertHash || "";
-    current.incidents.unshift(buildIncident({
-      evidenceTxHash: tx.hash,
-      alertTxHash: proof.txHash,
-      decision,
-      recipient,
-      outflowAmountMnt: formatMnt(tx.value),
-      source: "mantle-transaction",
-      thresholdMnt: policy.thresholdMnt,
-    }));
+    current.incidents.unshift(incident);
   });
 }
