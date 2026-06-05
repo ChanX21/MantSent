@@ -1,5 +1,5 @@
-import { actionButton, alertCard, chatLine, metric, proofCard } from "./components.js";
-import { cls, short } from "./format.js";
+import { actionButton, alertCard, chatLine, metric, proofCard, proofMeta } from "./components.js";
+import { cls, proofValue, short } from "./format.js";
 import { agent, progress, state, steps } from "./state.js";
 import type { StepViewModel } from "./types.js";
 
@@ -20,9 +20,9 @@ export function commandView(): string {
           ${state.agentCreated ? chatLine("user", `/watch ${agent.wallet || "0xTreasuryWallet"}`) : ""}
           ${state.walletWatched ? chatLine("bot", "Watching this Mantle wallet.", ["Set a risk rule with /policy"]) : ""}
           ${state.walletWatched ? chatLine("user", "/policy Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.") : ""}
-          ${state.policyActive ? chatLine("bot", "Policy active on Mantle.", ["Asset MNT", "Trigger outflow greater than 10 MNT", "Escalation new recipient = Critical", `Proof ${short(agent.policyTx)}`]) : ""}
+          ${state.policyActive ? chatLine("bot", "Policy active on Mantle.", ["Asset MNT", "Trigger outflow greater than 10 MNT", "Escalation new recipient = Critical", proofMeta("Proof", agent.policyTx)]) : ""}
           ${state.transferDetected ? alertCard() : ""}
-          ${state.resolved ? chatLine("bot", "Outcome recorded on Mantle.", [`Label ${state.outcome}`, `Proof ${short(agent.outcomeTx)}`]) : ""}
+          ${state.resolved ? chatLine("bot", "Outcome recorded on Mantle.", [`Label ${state.outcome}`, proofMeta("Proof", agent.outcomeTx)]) : ""}
         </div>
       </div>
 
@@ -78,7 +78,7 @@ export function passportView(): string {
           <span class="eyebrow">Active policy</span>
           <h3>MNT outflow greater than 10 to a new recipient</h3>
         </div>
-        <code>${state.policyActive ? short(agent.policyTx) : "Policy proof pending"}</code>
+        <code>${state.policyActive ? proofValue(agent.policyTx) : "Policy proof pending"}</code>
       </div>
       <div class="timeline">
         ${steps.map((step) => timelineItem(step)).join("")}
@@ -90,9 +90,9 @@ export function passportView(): string {
 export function evidenceView(): string {
   return `
     <section class="evidence-grid">
-      ${proofCard("Identity Registry", "ERC-8004 Agent ID", state.agentCreated, `agentURI ipfs://mantsent/${agent.id}`)}
+      ${proofCard("Identity Registry", "ERC-8004 Agent ID", state.agentCreated, `agentURI ipfs://mantsent/${agent.id}`, false)}
       ${proofCard("Signal Ledger", "PolicyCommitted", state.policyActive, agent.policyTx)}
-      ${proofCard("Mantle Evidence", "Native MNT transfer", state.transferDetected, agent.tx)}
+      ${proofCard("Mantle Evidence", "Evidence hash", state.transferDetected, agent.tx, false)}
       ${proofCard("Signal Ledger", "AlertCommitted", state.transferDetected, agent.alertTx)}
       ${proofCard("Signal Ledger", "OutcomeRecorded", state.resolved, agent.outcomeTx)}
       ${proofCard("Runtime", "Environment ready", true, "Secrets loaded from .env")}

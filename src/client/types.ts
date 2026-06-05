@@ -19,6 +19,7 @@ export interface AgentViewModel {
   policyTx: string;
   alertTx: string;
   outcomeTx: string;
+  chainId: string;
 }
 
 export type ViewName = "command" | "passport" | "evidence";

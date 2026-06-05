@@ -48,6 +48,17 @@ a {
   color: inherit;
 }
 
+.proof-link {
+  color: var(--mantle-soft);
+  text-decoration-color: rgba(183, 242, 211, 0.45);
+  text-underline-offset: 3px;
+}
+
+.proof-link:hover {
+  color: #ffffff;
+  text-decoration-color: var(--mantle);
+}
+
 #app {
   min-height: 100vh;
 }

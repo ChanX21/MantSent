@@ -19,6 +19,7 @@ export const agent: AgentViewModel = {
   policyTx: "",
   alertTx: "",
   outcomeTx: "",
+  chainId: "5003",
 };
 
 export const steps: StepViewModel[] = [

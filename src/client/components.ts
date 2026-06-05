@@ -1,5 +1,5 @@
 import { agent, state } from "./state.js";
-import { gate, short } from "./format.js";
+import { gate, proofValue, short, txLink } from "./format.js";
 import type { ActionName } from "./types.js";
 
 export function chatLine(kind: "user" | "bot", text: string, meta: string[] = []): string {
@@ -48,12 +48,16 @@ export function metric(label: string, value: number): string {
   `;
 }
 
-export function proofCard(title: string, label: string, done: boolean, value: string): string {
+export function proofCard(title: string, label: string, done: boolean, value: string, linked = true): string {
   return `
     <article class="proof-card ${done ? "done" : ""}">
       <span>${title}</span>
       <h3>${label}</h3>
-      <code>${done ? value : "Pending"}</code>
+      <code>${done ? (linked ? proofValue(value) : value) : "Pending"}</code>
     </article>
   `;
+}
+
+export function proofMeta(label: string, txHash: string): string {
+  return txHash ? `${label} ${txLink(txHash)}` : `${label} Pending`;
 }

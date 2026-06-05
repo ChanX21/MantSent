@@ -1,6 +1,7 @@
 import type { ActionName, PublicState } from "../../shared/types.js";
 import type { ActionService } from "../actions/action-service.js";
 import { mutateState } from "../state/store.js";
+import { mantleTxUrl } from "../../shared/explorer.js";
 
 const demoWallet = "0x7f2c2fbb1d2e4b6e6f8e45b902399d8a3c02a91e";
 const demoPolicy = "Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.";
@@ -17,6 +18,9 @@ interface TelegramResponse<T> {
   description?: string;
 }
 
+type InlineButton = { text: string; callback_data: string } | { text: string; url: string };
+type InlineKeyboard = InlineButton[][];
+
 export interface TelegramService {
   call: <T>(method: string, body: Record<string, unknown>) => Promise<T>;
   handleUpdate: (update: TelegramUpdate) => Promise<void>;
@@ -24,7 +28,7 @@ export interface TelegramService {
   sendStatus: (chatId: number) => Promise<void>;
 }
 
-export function createTelegramService({ botToken, actions }: { botToken?: string; actions: ActionService }): TelegramService {
+export function createTelegramService({ botToken, actions, chainId }: { botToken?: string; actions: ActionService; chainId?: string }): TelegramService {
   async function call<T>(method: string, body: Record<string, unknown>): Promise<T> {
     if (!botToken) throw new Error("TELEGRAM_BOT_TOKEN is not set.");
     const response = await fetch(`https://api.telegram.org/bot${botToken}/${method}`, {
@@ -42,7 +46,8 @@ export function createTelegramService({ botToken, actions }: { botToken?: string
     await call("sendMessage", {
       chat_id: chatId,
       text: statusText(state),
-      reply_markup: { inline_keyboard: buttonsFor(state) },
+      disable_web_page_preview: true,
+      reply_markup: { inline_keyboard: buttonsFor(state, chainId) },
     });
   }
 
@@ -139,19 +144,35 @@ function rememberChat(chatId: number): void {
 }
 
 function statusText(state: PublicState): string {
-  return `MantSent on Mantle\nAgent: #${state.agentId}\nWallet: ${state.watchedWallet || "not set"}\nPolicy: ${state.policyActive ? `>${state.thresholdMnt} MNT to new recipient` : "not set"}\nOutcome: ${state.outcome}`;
+  const proofs = proofLines(state);
+  return `MantSent on Mantle\nAgent: #${state.agentId}\nWallet: ${state.watchedWallet || "not set"}\nPolicy: ${state.policyActive ? `>${state.thresholdMnt} MNT to new recipient` : "not set"}\nOutcome: ${state.outcome}${proofs ? `\n\nProofs:\n${proofs}` : ""}`;
 }
 
-function buttonsFor(state: PublicState) {
+function proofLines(state: PublicState): string {
+  return [
+    state.policyTxHash ? `Policy: ${mantleTxUrl(state.policyTxHash)}` : "",
+    state.alertTxHash ? `Alert: ${mantleTxUrl(state.alertTxHash)}` : "",
+    state.outcomeTxHash ? `Outcome: ${mantleTxUrl(state.outcomeTxHash)}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function buttonsFor(state: PublicState, chainId?: string): InlineKeyboard {
   if (!state.agentCreated) return [[{ text: "Create Agent", callback_data: "create" }]];
   if (!state.walletWatched) return [[{ text: "Watch Demo Wallet", callback_data: "watch_demo" }]];
   if (!state.policyActive) return [[{ text: "Commit Policy", callback_data: "policy_demo" }]];
   if (!state.transferDetected) return [[{ text: "Trigger Demo Outflow", callback_data: "transfer_demo" }]];
-  return [
+  const rows: InlineKeyboard = [
     [
       { text: "Expected Transfer", callback_data: "expected" },
       { text: "Suspicious Activity", callback_data: "suspicious" },
     ],
-    [{ text: "View Proof", callback_data: "proof" }],
   ];
+  const proofButtons: InlineButton[] = [];
+  if (state.policyTxHash) proofButtons.push({ text: "Policy Proof", url: mantleTxUrl(state.policyTxHash, chainId) });
+  if (state.alertTxHash) proofButtons.push({ text: "Alert Proof", url: mantleTxUrl(state.alertTxHash, chainId) });
+  if (state.outcomeTxHash) proofButtons.push({ text: "Outcome Proof", url: mantleTxUrl(state.outcomeTxHash, chainId) });
+  if (proofButtons.length) rows.push(proofButtons);
+  return rows;
 }

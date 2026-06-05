@@ -18,6 +18,7 @@ const actions = createActionService(env);
 const telegram = createTelegramService({
   botToken: env.TELEGRAM_BOT_TOKEN,
   actions,
+  chainId: env.MANTLE_CHAIN_ID,
 });
 const handler = createRequestHandler({ env, actions, telegram });
 
