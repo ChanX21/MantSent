@@ -72,7 +72,8 @@ export function createTelegramService({
     const state = actions.state();
     await call("sendMessage", {
       chat_id: chatId,
-      text: statusText(state),
+      text: statusText(state, chainId),
+      parse_mode: "HTML",
       disable_web_page_preview: true,
       reply_markup: { inline_keyboard: buttonsFor(state, chainId) },
     });
@@ -100,6 +101,17 @@ export function createTelegramService({
     else if (action === "policy_demo") await actions.run("policy", { text: demoPolicy });
     else if (action === "transfer_demo") await actions.run("transfer", {});
     else if (action === "monitor_on") await actions.run("monitor", {});
+    else if (action === "change_wallet") {
+      await actions.run("reset");
+      await call("sendMessage", {
+        chat_id: chatId,
+        text: "<b>Wallet setup reset.</b>\nSend <code>/watch 0x...</code> with the Mantle wallet you want MantSent to monitor.",
+        parse_mode: "HTML",
+      });
+    } else if (action === "redeploy_agent") {
+      await actions.run("reset");
+      await actions.run("create");
+    }
     else if (action === "proof") await sendStatus(chatId);
     else await actions.run(action as ActionName, {});
 
@@ -122,27 +134,40 @@ export function createTelegramService({
         await actions.run("watch", { address: args });
         await sendStatus(chatId);
       } else if (command === "/policy") {
-        await call("sendMessage", { chat_id: chatId, text: "Securing the policy proof on Mantle. This can take a moment." });
+        await call("sendMessage", { chat_id: chatId, text: "<b>Securing policy proof on Mantle.</b>\nThis can take a moment.", parse_mode: "HTML" });
         await actions.run("policy", { text: args });
         await sendStatus(chatId);
       } else if (command === "/simulate") {
-        await call("sendMessage", { chat_id: chatId, text: "Securing the alert proof on Mantle. This can take a moment." });
+        await call("sendMessage", { chat_id: chatId, text: "<b>Securing alert proof on Mantle.</b>\nThis can take a moment.", parse_mode: "HTML" });
         await actions.run("transfer", {});
         await sendStatus(chatId);
       } else if (command === "/monitor") {
         await actions.run("monitor", {});
-        await call("sendMessage", { chat_id: chatId, text: "Mantle monitor enabled. Confirmed native MNT outflows will be evaluated against the active wallet policy." });
+        await call("sendMessage", {
+          chat_id: chatId,
+          text: "<b>Mantle monitor enabled.</b>\nConfirmed native MNT outflows will be evaluated against the active wallet policy.",
+          parse_mode: "HTML",
+        });
+        await sendStatus(chatId);
+      } else if (command === "/reset") {
+        await actions.run("reset");
+        await call("sendMessage", { chat_id: chatId, text: "<b>MantSent session reset.</b>\nUse /create to start again.", parse_mode: "HTML" });
+        await sendStatus(chatId);
+      } else if (command === "/redeploy") {
+        await actions.run("reset");
+        await actions.run("create");
         await sendStatus(chatId);
       } else if (command === "/incidents" || command === "/proof") {
         await sendStatus(chatId);
       } else {
         await call("sendMessage", {
           chat_id: chatId,
-          text: "Commands: /create, /watch 0x..., /policy alert me if more than 10 MNT leaves, /simulate, /incidents, /proof",
+          text: "<b>Commands</b>\n/create\n/watch 0x...\n/policy alert me if more than 10 MNT leaves\n/monitor\n/simulate\n/proof\n/reset\n/redeploy",
+          parse_mode: "HTML",
         });
       }
     } catch (error) {
-      await call("sendMessage", { chat_id: chatId, text: `MantSent error: ${(error as Error).message}` });
+      await call("sendMessage", { chat_id: chatId, text: `<b>MantSent error</b>\n${escapeHtml((error as Error).message)}`, parse_mode: "HTML" });
     }
   }
 
@@ -172,6 +197,7 @@ export function createTelegramService({
         const image = await readFile(telegramImagePath);
         form.append("chat_id", String(chatId));
         form.append("caption", telegramIntroCaption);
+        form.append("parse_mode", "HTML");
         form.append("photo", new Blob([image], { type: "image/png" }), basename(telegramImagePath));
         await callMultipart("sendPhoto", form);
       } else {
@@ -179,12 +205,14 @@ export function createTelegramService({
           chat_id: chatId,
           photo: mantleLogoUrl,
           caption: telegramIntroCaption,
+          parse_mode: "HTML",
         });
       }
     } catch {
       await call("sendMessage", {
         chat_id: chatId,
         text: telegramIntroCaption,
+        parse_mode: "HTML",
       });
     }
   }
@@ -196,55 +224,64 @@ function rememberChat(chatId: number): void {
   });
 }
 
-function statusText(state: PublicState): string {
-  const proofs = proofLines(state);
+function statusText(state: PublicState, chainId?: string): string {
+  const proofs = proofLines(state, chainId);
   const latest = state.incidents[0];
-  return `MantSent on Mantle
-${mantleProofTagline}
+  return `<b>MantSent on Mantle</b>
+${escapeHtml(mantleProofTagline)}
 
-Agent
-ID: #${state.agentId}
-Skill: ${state.agentProfile.skill.name}
-Identity: ${state.agentIdentityStatus === "erc8004-registered" ? "ERC-8004 registered" : "demo profile"}
-Scope: one Mantle wallet
+<b>Agent</b>
+ID: <code>#${escapeHtml(state.agentId)}</code>
+Skill: ${escapeHtml(state.agentProfile.skill.name)}
+Identity: ${state.agentIdentityStatus === "erc8004-registered" ? "ERC-8004 registered" : "Demo profile"}
+Scope: One Mantle wallet
 
-Monitoring
-Wallet: ${state.watchedWallet || "not set"}
-Policy: ${state.policyActive ? `>${state.thresholdMnt} MNT to a new recipient` : "not set"}
-Status: ${state.monitorActive ? "live Mantle polling enabled" : "not enabled"}
+<b>Monitoring</b>
+Wallet: ${state.watchedWallet ? `<code>${escapeHtml(state.watchedWallet)}</code>` : "Not set"}
+Policy: ${state.policyActive ? `&gt;${state.thresholdMnt} MNT to a new recipient` : "Not set"}
+Status: ${state.monitorActive ? "Live Mantle polling enabled" : "Not enabled"}
 
-Signal
-Evidence: ${state.evidenceSource === "mantle-transaction" ? "confirmed Mantle transaction" : "demo/simulated event"}
-Outcome: ${state.outcome}${latest ? `
+<b>Signal</b>
+Evidence: ${state.evidenceSource === "mantle-transaction" ? "Confirmed Mantle transaction" : "Demo/simulated event"}
+Outcome: ${escapeHtml(state.outcome)}${latest ? `
 
-Agent explanation (${latest.explanationProvider})
-${latest.explanation}` : ""}${proofs ? `
+<b>Agent explanation</b> (${escapeHtml(latest.explanationProvider)})
+${escapeHtml(latest.explanation)}` : ""}${proofs ? `
 
-Proof receipts
+<b>Proof receipts</b>
 ${proofs}` : ""}`;
 }
 
-function proofLines(state: PublicState): string {
+function proofLines(state: PublicState, chainId?: string): string {
   return [
-    state.policyTxHash ? `Policy: ${mantleTxUrl(state.policyTxHash)}` : "",
-    state.alertTxHash ? `Alert: ${mantleTxUrl(state.alertTxHash)}` : "",
-    state.outcomeTxHash ? `Outcome: ${mantleTxUrl(state.outcomeTxHash)}` : "",
+    state.policyTxHash ? proofLink("Policy", state.policyTxHash, chainId) : "",
+    state.alertTxHash ? proofLink("Alert", state.alertTxHash, chainId) : "",
+    state.outcomeTxHash ? proofLink("Outcome", state.outcomeTxHash, chainId) : "",
   ]
     .filter(Boolean)
-    .join("\n");
+    .join("  |  ");
+}
+
+function proofLink(label: string, txHash: string, chainId?: string): string {
+  return `<a href="${mantleTxUrl(txHash, chainId)}">${label}</a>`;
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function buttonsFor(state: PublicState, chainId?: string): InlineKeyboard {
   if (!state.agentCreated) return [[{ text: "Create Agent", callback_data: "create" }]];
-  if (!state.walletWatched) return [[{ text: "Watch Demo Wallet", callback_data: "watch_demo" }]];
-  if (!state.policyActive) return [[{ text: "Commit Policy", callback_data: "policy_demo" }]];
+  if (!state.walletWatched) return [[{ text: "Watch Demo Wallet", callback_data: "watch_demo" }], managementButtons()];
+  if (!state.policyActive) return [[{ text: "Commit Policy", callback_data: "policy_demo" }], managementButtons()];
   if (!state.monitorActive) {
     return [
       [{ text: "Enable Real Monitor", callback_data: "monitor_on" }],
       [{ text: "Trigger Demo Outflow", callback_data: "transfer_demo" }],
+      managementButtons(),
     ];
   }
-  if (!state.transferDetected) return [[{ text: "Trigger Demo Outflow", callback_data: "transfer_demo" }]];
+  if (!state.transferDetected) return [[{ text: "Trigger Demo Outflow", callback_data: "transfer_demo" }], managementButtons()];
   const rows: InlineKeyboard = [
     [
       { text: "Expected Transfer", callback_data: "expected" },
@@ -256,5 +293,14 @@ function buttonsFor(state: PublicState, chainId?: string): InlineKeyboard {
   if (state.alertTxHash) proofButtons.push({ text: "Alert Proof", url: mantleTxUrl(state.alertTxHash, chainId) });
   if (state.outcomeTxHash) proofButtons.push({ text: "Outcome Proof", url: mantleTxUrl(state.outcomeTxHash, chainId) });
   if (proofButtons.length) rows.push(proofButtons);
+  rows.push(managementButtons());
   return rows;
+}
+
+function managementButtons(): InlineButton[] {
+  return [
+    { text: "Change Wallet", callback_data: "change_wallet" },
+    { text: "Restart", callback_data: "reset" },
+    { text: "Redeploy Agent", callback_data: "redeploy_agent" },
+  ];
 }

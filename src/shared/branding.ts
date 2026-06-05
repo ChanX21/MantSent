@@ -5,6 +5,6 @@ export const defaultTelegramImagePath = "assets/mantsent-telegram-banner.png";
 export const mantleProofTagline = "Proofs secured on Mantle";
 
 export const telegramIntroCaption =
-  "MantSent on Mantle\n" +
+  "<b>MantSent on Mantle</b>\n" +
   "Treasury anomaly monitoring for Mantle wallets.\n\n" +
-  "Secured on Mantle with policy-driven alerts, operator-reviewed outcomes, and explorer-linked proof receipts.";
+  "<b>Secured on Mantle</b> with policy-driven alerts, operator-reviewed outcomes, and explorer-linked proof receipts.";
