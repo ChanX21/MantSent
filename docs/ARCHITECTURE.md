@@ -22,6 +22,7 @@ The current agent profile is still a local demo profile until ERC-8004 Identity 
 | --- | --- | --- |
 | Server composition | `src/server/main.ts` | Wires HTTP, Telegram, monitoring, env bootstrap. |
 | Product workflows | `src/server/actions/action-service.ts` | Handles create/watch/policy/simulate/resolve/reset/monitor actions. |
+| Monitoring agent | `src/server/agent/single-wallet-monitoring-agent.ts` | Defines the one-wallet monitoring skill, agent profile, transfer evaluation entrypoint, and alert explanation builder. |
 | Policy parsing | `src/server/policy/policy-parser.ts` | Converts user text into a deterministic `PolicyRule`. |
 | Policy enforcement | `src/server/policy/policy-engine.ts` | Evaluates transfers against the active rule and recipient history. |
 | Mantle monitor | `src/server/monitor/mantle-monitor.ts` | Polls confirmed blocks for native MNT outflows from the watched wallet. |
@@ -55,6 +56,26 @@ The monitor:
 7. Stores the block cursor and incident so duplicate processing is avoided.
 
 Current monitor scope is native MNT only. ERC-20 transfers need log scanning as a separate module.
+
+## Agent Skill
+
+The first production skill is intentionally narrow:
+
+```text
+single-wallet-mnt-outflow-monitor
+```
+
+It owns one watched Mantle address and evaluates native MNT outflows against one active policy. The agent module does not send Telegram messages or render UI. It provides:
+
+- the agent profile shown to users
+- the monitoring skill metadata
+- one-wallet address assignment
+- policy activation
+- transfer evaluation
+- alert explanation generation
+- incident construction
+
+This keeps the agent intelligence easy to test and extend. A future ERC-20 skill, multisig skill, or ERC-8004 identity module should be added beside it instead of being mixed into the Telegram or frontend adapters.
 
 ## Policy Enforcement
 
