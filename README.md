@@ -78,6 +78,8 @@ The code is split by operational responsibility so a future change can be assign
 
 Debug from the boundary first: frontend issues start at `src/client/api.ts`; Telegram issues start at `src/server/telegram/telegram-service.ts`; proof transaction issues start at `src/server/actions/action-service.ts` and then `src/server/chain/proofs.ts`.
 
+For the fuller engineering map, see `docs/ARCHITECTURE.md`.
+
 ## Guardrails
 
 MantSent reports policy-based anomaly signals. It does not claim theft detection, custody protection, or trading advice. The UI uses operator-confirmed outcomes as verified performance data.
