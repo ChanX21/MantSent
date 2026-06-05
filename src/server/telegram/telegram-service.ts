@@ -83,6 +83,7 @@ export function createTelegramService({
     if (action === "watch_demo") await actions.run("watch", { address: demoWallet });
     else if (action === "policy_demo") await actions.run("policy", { text: demoPolicy });
     else if (action === "transfer_demo") await actions.run("transfer", {});
+    else if (action === "monitor_on") await actions.run("monitor", {});
     else if (action === "proof") await sendStatus(chatId);
     else await actions.run(action as ActionName, {});
 
@@ -111,6 +112,10 @@ export function createTelegramService({
       } else if (command === "/simulate") {
         await call("sendMessage", { chat_id: chatId, text: "Committing alert proof on Mantle. This can take a moment." });
         await actions.run("transfer", {});
+        await sendStatus(chatId);
+      } else if (command === "/monitor") {
+        await actions.run("monitor", {});
+        await call("sendMessage", { chat_id: chatId, text: "Mantle monitor enabled. I will scan confirmed native MNT outflows for the active wallet and policy." });
         await sendStatus(chatId);
       } else if (command === "/incidents" || command === "/proof") {
         await sendStatus(chatId);
@@ -168,7 +173,7 @@ function rememberChat(chatId: number): void {
 
 function statusText(state: PublicState): string {
   const proofs = proofLines(state);
-  return `MantSent on Mantle\n${mantleProofTagline}\n\nAgent: #${state.agentId}\nWallet: ${state.watchedWallet || "not set"}\nPolicy: ${state.policyActive ? `>${state.thresholdMnt} MNT to new recipient` : "not set"}\nOutcome: ${state.outcome}${proofs ? `\n\nProofs:\n${proofs}` : ""}`;
+  return `MantSent on Mantle\n${mantleProofTagline}\n\nAgent: #${state.agentId}\nIdentity: ${state.agentIdentityStatus === "erc8004-registered" ? "ERC-8004 registered" : "demo profile"}\nWallet: ${state.watchedWallet || "not set"}\nPolicy: ${state.policyActive ? `>${state.thresholdMnt} MNT to new recipient` : "not set"}\nMonitor: ${state.monitorActive ? "real Mantle polling enabled" : "off"}\nEvidence: ${state.evidenceSource === "mantle-transaction" ? "real Mantle transaction" : "demo/simulated"}\nOutcome: ${state.outcome}${proofs ? `\n\nProofs:\n${proofs}` : ""}`;
 }
 
 function proofLines(state: PublicState): string {
@@ -185,6 +190,12 @@ function buttonsFor(state: PublicState, chainId?: string): InlineKeyboard {
   if (!state.agentCreated) return [[{ text: "Create Agent", callback_data: "create" }]];
   if (!state.walletWatched) return [[{ text: "Watch Demo Wallet", callback_data: "watch_demo" }]];
   if (!state.policyActive) return [[{ text: "Commit Policy", callback_data: "policy_demo" }]];
+  if (!state.monitorActive) {
+    return [
+      [{ text: "Enable Real Monitor", callback_data: "monitor_on" }],
+      [{ text: "Trigger Demo Outflow", callback_data: "transfer_demo" }],
+    ];
+  }
   if (!state.transferDetected) return [[{ text: "Trigger Demo Outflow", callback_data: "transfer_demo" }]];
   const rows: InlineKeyboard = [
     [

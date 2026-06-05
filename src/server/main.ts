@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { createActionService } from "./actions/action-service.js";
 import { loadEnv, updateEnvValue } from "./config/env.js";
 import { createRequestHandler } from "./http/request-handler.js";
+import { startMantleMonitor } from "./monitor/mantle-monitor.js";
 import { createTelegramService } from "./telegram/telegram-service.js";
 
 const env = loadEnv();
@@ -28,3 +29,4 @@ createServer(handler).listen(port, "0.0.0.0", () => {
 });
 
 telegram.poll();
+startMantleMonitor(env);

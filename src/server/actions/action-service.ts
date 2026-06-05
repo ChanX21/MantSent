@@ -85,7 +85,12 @@ async function simulateTransfer(env: RuntimeEnv, payload: ActionPayload): Promis
     state.evidenceSource = "demo";
     state.recipient = recipient;
   });
-  const proof = await commitAlertProof(env, before, evidenceTxHash);
+  const proof = await commitAlertProof(env, before, {
+    evidenceTxHash,
+    amountMnt: "25",
+    recipientFirstSeen: decision.recipientFirstSeen,
+    severity: decision.severity,
+  });
 
   return mutateState((state) => {
     state.transferDetected = true;
@@ -94,7 +99,7 @@ async function simulateTransfer(env: RuntimeEnv, payload: ActionPayload): Promis
     state.incidents.unshift({
       evidenceTxHash,
       alertTxHash: proof.txHash,
-      severity: "CRITICAL",
+      severity: decision.severity,
       outcome: "Unresolved",
       createdAt: new Date().toISOString(),
       recipient,

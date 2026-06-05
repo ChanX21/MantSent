@@ -11,6 +11,13 @@ interface ProofResult {
   feedbackHash?: string;
 }
 
+export interface AlertProofInput {
+  evidenceTxHash: string;
+  amountMnt: string;
+  recipientFirstSeen: boolean;
+  severity: "CRITICAL" | "HIGH";
+}
+
 function requireProofWriter(env: RuntimeEnv) {
   requiredEnv(env, chainEnvKeys);
   return ledger(env);
@@ -35,26 +42,26 @@ export async function commitPolicyProof(env: RuntimeEnv, state: AppState): Promi
   return { policyHash, txHash: receipt.hash };
 }
 
-export async function commitAlertProof(env: RuntimeEnv, state: AppState, evidenceTxHash: string): Promise<ProofResult> {
+export async function commitAlertProof(env: RuntimeEnv, state: AppState, input: AlertProofInput): Promise<ProofResult> {
   const watchedWallet = normalizeAddress(state.watchedWallet);
   const contract = requireProofWriter(env);
   const signer = wallet(env);
   const alertHash = digest({
     agentId: state.agentId,
     watchedWallet,
-    evidenceTxHash,
-    amount: 25,
+    evidenceTxHash: input.evidenceTxHash,
+    amountMnt: input.amountMnt,
     thresholdMnt: state.thresholdMnt,
-    recipientFirstSeen: true,
-    severity: "CRITICAL",
+    recipientFirstSeen: input.recipientFirstSeen,
+    severity: input.severity,
   });
 
   const tx = await contract.getFunction("commitAlert")(
     BigInt(state.agentId),
     alertHash,
     watchedWallet,
-    bytes32TxHash(evidenceTxHash),
-    3,
+    bytes32TxHash(input.evidenceTxHash),
+    input.severity === "CRITICAL" ? 3 : 2,
     { nonce: await signer.getNonce("pending") },
   );
   const receipt = await tx.wait();

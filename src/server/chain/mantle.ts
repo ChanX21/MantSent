@@ -38,3 +38,11 @@ export function bytes32TxHash(hash: string): string {
 export function normalizeAddress(address: string): string {
   return ethers.getAddress(String(address).trim().toLowerCase());
 }
+
+export function formatMnt(value: bigint): string {
+  return ethers.formatEther(value);
+}
+
+export function parseMnt(value: string): bigint {
+  return ethers.parseEther(value);
+}
