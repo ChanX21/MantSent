@@ -1,6 +1,8 @@
 import type { ActionName, ActionPayload, AppState, OutcomeLabel, PublicState, RuntimeEnv } from "../../shared/types.js";
 import { digest, normalizeAddress } from "../chain/mantle.js";
 import { commitAlertProof, commitOutcomeProof, commitPolicyProof } from "../chain/proofs.js";
+import { evaluateTransfer } from "../policy/policy-engine.js";
+import { parsePolicy } from "../policy/policy-parser.js";
 import { mutateState, publicState } from "../state/store.js";
 
 const demoRecipient = "0x48B981747384A90A24ad834DAd6AfaB6D1f0F0C2";
@@ -19,14 +21,11 @@ export function createActionService(env: RuntimeEnv): ActionService {
       if (action === "policy") return activatePolicy(env, payload);
       if (action === "transfer") return simulateTransfer(env, payload);
       if (action === "expected" || action === "suspicious") return resolveAlert(env, action);
+      if (action === "monitor") return enableMonitor();
       if (action === "reset") return resetDemo();
       throw new Error(`Unknown action: ${action}`);
     },
   };
-}
-
-function policyThreshold(text?: string): number {
-  return Number(String(text || "").match(/(\d+(?:\.\d+)?)\s*MNT/i)?.[1] ?? 10);
 }
 
 function createAgent(): AppState {
@@ -47,9 +46,11 @@ function watchWallet(payload: ActionPayload): AppState {
 async function activatePolicy(env: RuntimeEnv, payload: ActionPayload): Promise<PublicState> {
   const current = publicState();
   if (current.policyActive && current.policyTxHash) return current;
+  const policy = parsePolicy(payload.text);
 
   const before = mutateState((state) => {
-    state.thresholdMnt = policyThreshold(payload.text);
+    state.policy = policy;
+    state.thresholdMnt = policy.thresholdMnt;
   });
   const proof = await commitPolicyProof(env, before);
 
@@ -63,10 +64,26 @@ async function simulateTransfer(env: RuntimeEnv, payload: ActionPayload): Promis
   const current = publicState();
   if (current.transferDetected && current.alertTxHash && !payload.force) return current;
 
+  const policy = current.policy ?? parsePolicy();
   const evidenceTxHash = payload.evidenceTxHash || digest({ demo: "controlled-mnt-outflow", at: Date.now() });
+  const recipient = payload.recipient || current.recipient || demoRecipient;
+  const decision = evaluateTransfer(
+    policy,
+    {
+      hash: evidenceTxHash,
+      from: current.watchedWallet,
+      to: recipient,
+      amountMnt: 25,
+    },
+    current.seenRecipients,
+  );
+
+  if (!decision.shouldAlert) return current;
+
   const before = mutateState((state) => {
     state.evidenceTxHash = evidenceTxHash;
-    state.recipient = payload.recipient || state.recipient || demoRecipient;
+    state.evidenceSource = "demo";
+    state.recipient = recipient;
   });
   const proof = await commitAlertProof(env, before, evidenceTxHash);
 
@@ -80,6 +97,9 @@ async function simulateTransfer(env: RuntimeEnv, payload: ActionPayload): Promis
       severity: "CRITICAL",
       outcome: "Unresolved",
       createdAt: new Date().toISOString(),
+      recipient,
+      outflowAmountMnt: "25",
+      source: "demo",
     });
   });
 }
@@ -114,12 +134,23 @@ function resetDemo(): AppState {
       outcome: "Unresolved",
       watchedWallet: "",
       recipient: "",
+      policy: null,
       evidenceTxHash: "",
+      evidenceSource: "demo",
       policyTxHash: "",
       alertTxHash: "",
       outcomeTxHash: "",
       lastAlertHash: "",
+      monitorActive: false,
+      monitorCursorBlock: 0,
+      seenRecipients: [],
       incidents: [],
     });
+  });
+}
+
+function enableMonitor(): AppState {
+  return mutateState((state) => {
+    state.monitorActive = true;
   });
 }

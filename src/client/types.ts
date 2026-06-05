@@ -4,6 +4,7 @@ export interface ClientState {
   agentCreated: boolean;
   walletWatched: boolean;
   policyActive: boolean;
+  monitorActive: boolean;
   transferDetected: boolean;
   resolved: boolean;
   outcome: PublicState["outcome"];
@@ -20,6 +21,8 @@ export interface AgentViewModel {
   alertTx: string;
   outcomeTx: string;
   chainId: string;
+  evidenceSource: PublicState["evidenceSource"];
+  identityStatus: PublicState["agentIdentityStatus"];
 }
 
 export type ViewName = "command" | "passport" | "evidence";

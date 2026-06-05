@@ -3,6 +3,7 @@ var state = {
   agentCreated: false,
   walletWatched: false,
   policyActive: false,
+  monitorActive: false,
   transferDetected: false,
   resolved: false,
   outcome: "Unresolved",
@@ -17,14 +18,16 @@ var agent = {
   policyTx: "",
   alertTx: "",
   outcomeTx: "",
-  chainId: "5003"
+  chainId: "5003",
+  evidenceSource: "demo",
+  identityStatus: "placeholder"
 };
 var steps = [
   {
     key: "agentCreated",
     title: "ERC-8004 agent",
     proof: "IdentityRegistry",
-    detail: () => "MantSent Treasury Anomaly Monitor registered on Mantle testnet."
+    detail: () => agent.identityStatus === "erc8004-registered" ? "MantSent Treasury Anomaly Monitor is registered through ERC-8004 on Mantle." : "Local demo agent profile is active. ERC-8004 registration is the next identity step."
   },
   {
     key: "walletWatched",
@@ -42,7 +45,7 @@ var steps = [
     key: "transferDetected",
     title: "Critical alert",
     proof: "AlertCommitted",
-    detail: () => "25 MNT left the watched wallet for a first-seen recipient."
+    detail: () => agent.evidenceSource === "mantle-transaction" ? "A real Mantle transaction matched the active policy." : "A demo alert proof was committed without a real transfer watcher event."
   },
   {
     key: "resolved",
@@ -56,6 +59,7 @@ function applyRemoteState(remote) {
     agentCreated: remote.agentCreated,
     walletWatched: remote.walletWatched,
     policyActive: remote.policyActive,
+    monitorActive: remote.monitorActive,
     transferDetected: remote.transferDetected,
     resolved: remote.resolved,
     outcome: remote.outcome
@@ -67,7 +71,9 @@ function applyRemoteState(remote) {
     tx: remote.evidenceTxHash || "",
     policyTx: remote.policyTxHash || "",
     alertTx: remote.alertTxHash || "",
-    outcomeTx: remote.outcomeTxHash || ""
+    outcomeTx: remote.outcomeTxHash || "",
+    evidenceSource: remote.evidenceSource,
+    identityStatus: remote.agentIdentityStatus
   });
 }
 function progress() {
