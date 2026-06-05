@@ -5,6 +5,7 @@ import { loadEnv, updateEnvValue } from "./config/env.js";
 import { createRequestHandler } from "./http/request-handler.js";
 import { startMantleMonitor } from "./monitor/mantle-monitor.js";
 import { createTelegramService } from "./telegram/telegram-service.js";
+import { defaultTelegramImagePath } from "../shared/branding.js";
 
 const env = loadEnv();
 const port = Number(process.env.PORT || 5173);
@@ -21,6 +22,7 @@ const telegram = createTelegramService({
   actions,
   chainId: env.MANTLE_CHAIN_ID,
   mantleLogoUrl: env.MANTLE_LOGO_URL,
+  telegramImagePath: env.MANTLE_TELEGRAM_IMAGE_PATH || defaultTelegramImagePath,
 });
 const handler = createRequestHandler({ env, actions, telegram });
 

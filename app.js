@@ -315,7 +315,7 @@ function timelineItem(step) {
 }
 
 // src/shared/branding.ts
-var defaultMantleLogoUrl = "https://dl.svgcdn.com/png/token-branded/mantle-800.png";
+var defaultMantleLogoUrl = "/assets/mantsent-telegram-banner.png";
 var mantleProofTagline = "Proofs secured on Mantle";
 
 // src/client/render.ts

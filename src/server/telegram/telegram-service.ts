@@ -1,8 +1,11 @@
+import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import { basename } from "node:path";
 import type { ActionName, PublicState } from "../../shared/types.js";
 import type { ActionService } from "../actions/action-service.js";
 import { mutateState } from "../state/store.js";
 import { mantleTxUrl } from "../../shared/explorer.js";
-import { defaultMantleLogoUrl, mantleProofTagline, telegramIntroCaption } from "../../shared/branding.js";
+import { defaultMantleLogoUrl, defaultTelegramImagePath, mantleProofTagline, telegramIntroCaption } from "../../shared/branding.js";
 
 const demoWallet = "0x7f2c2fbb1d2e4b6e6f8e45b902399d8a3c02a91e";
 const demoPolicy = "Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.";
@@ -34,11 +37,13 @@ export function createTelegramService({
   actions,
   chainId,
   mantleLogoUrl = defaultMantleLogoUrl,
+  telegramImagePath = defaultTelegramImagePath,
 }: {
   botToken?: string;
   actions: ActionService;
   chainId?: string;
   mantleLogoUrl?: string;
+  telegramImagePath?: string;
 }): TelegramService {
   async function call<T>(method: string, body: Record<string, unknown>): Promise<T> {
     if (!botToken) throw new Error("TELEGRAM_BOT_TOKEN is not set.");
@@ -46,6 +51,17 @@ export function createTelegramService({
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
+    });
+    const payload = (await response.json()) as TelegramResponse<T>;
+    if (!payload.ok) throw new Error(payload.description || `Telegram ${method} failed`);
+    return payload.result;
+  }
+
+  async function callMultipart<T>(method: string, body: FormData): Promise<T> {
+    if (!botToken) throw new Error("TELEGRAM_BOT_TOKEN is not set.");
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/${method}`, {
+      method: "POST",
+      body,
     });
     const payload = (await response.json()) as TelegramResponse<T>;
     if (!payload.ok) throw new Error(payload.description || `Telegram ${method} failed`);
@@ -106,16 +122,16 @@ export function createTelegramService({
         await actions.run("watch", { address: args });
         await sendStatus(chatId);
       } else if (command === "/policy") {
-        await call("sendMessage", { chat_id: chatId, text: "Committing policy proof on Mantle. This can take a moment." });
+        await call("sendMessage", { chat_id: chatId, text: "Securing the policy proof on Mantle. This can take a moment." });
         await actions.run("policy", { text: args });
         await sendStatus(chatId);
       } else if (command === "/simulate") {
-        await call("sendMessage", { chat_id: chatId, text: "Committing alert proof on Mantle. This can take a moment." });
+        await call("sendMessage", { chat_id: chatId, text: "Securing the alert proof on Mantle. This can take a moment." });
         await actions.run("transfer", {});
         await sendStatus(chatId);
       } else if (command === "/monitor") {
         await actions.run("monitor", {});
-        await call("sendMessage", { chat_id: chatId, text: "Mantle monitor enabled. I will scan confirmed native MNT outflows for the active wallet and policy." });
+        await call("sendMessage", { chat_id: chatId, text: "Mantle monitor enabled. Confirmed native MNT outflows will be evaluated against the active wallet policy." });
         await sendStatus(chatId);
       } else if (command === "/incidents" || command === "/proof") {
         await sendStatus(chatId);
@@ -151,11 +167,20 @@ export function createTelegramService({
 
   async function sendMantleIntro(chatId: number): Promise<void> {
     try {
-      await call("sendPhoto", {
-        chat_id: chatId,
-        photo: mantleLogoUrl,
-        caption: telegramIntroCaption,
-      });
+      if (telegramImagePath && existsSync(telegramImagePath)) {
+        const form = new FormData();
+        const image = await readFile(telegramImagePath);
+        form.append("chat_id", String(chatId));
+        form.append("caption", telegramIntroCaption);
+        form.append("photo", new Blob([image], { type: "image/png" }), basename(telegramImagePath));
+        await callMultipart("sendPhoto", form);
+      } else {
+        await call("sendPhoto", {
+          chat_id: chatId,
+          photo: mantleLogoUrl,
+          caption: telegramIntroCaption,
+        });
+      }
     } catch {
       await call("sendMessage", {
         chat_id: chatId,
@@ -174,7 +199,29 @@ function rememberChat(chatId: number): void {
 function statusText(state: PublicState): string {
   const proofs = proofLines(state);
   const latest = state.incidents[0];
-  return `MantSent on Mantle\n${mantleProofTagline}\n\nAgent: #${state.agentId}\nSkill: ${state.agentProfile.skill.name}\nScope: one Mantle address\nIdentity: ${state.agentIdentityStatus === "erc8004-registered" ? "ERC-8004 registered" : "demo profile"}\nWallet: ${state.watchedWallet || "not set"}\nPolicy: ${state.policyActive ? `>${state.thresholdMnt} MNT to new recipient` : "not set"}\nMonitor: ${state.monitorActive ? "real Mantle polling enabled" : "off"}\nEvidence: ${state.evidenceSource === "mantle-transaction" ? "real Mantle transaction" : "demo/simulated"}\nOutcome: ${state.outcome}${latest ? `\n\nAgent explanation (${latest.explanationProvider}):\n${latest.explanation}` : ""}${proofs ? `\n\nProofs:\n${proofs}` : ""}`;
+  return `MantSent on Mantle
+${mantleProofTagline}
+
+Agent
+ID: #${state.agentId}
+Skill: ${state.agentProfile.skill.name}
+Identity: ${state.agentIdentityStatus === "erc8004-registered" ? "ERC-8004 registered" : "demo profile"}
+Scope: one Mantle wallet
+
+Monitoring
+Wallet: ${state.watchedWallet || "not set"}
+Policy: ${state.policyActive ? `>${state.thresholdMnt} MNT to a new recipient` : "not set"}
+Status: ${state.monitorActive ? "live Mantle polling enabled" : "not enabled"}
+
+Signal
+Evidence: ${state.evidenceSource === "mantle-transaction" ? "confirmed Mantle transaction" : "demo/simulated event"}
+Outcome: ${state.outcome}${latest ? `
+
+Agent explanation (${latest.explanationProvider})
+${latest.explanation}` : ""}${proofs ? `
+
+Proof receipts
+${proofs}` : ""}`;
 }
 
 function proofLines(state: PublicState): string {
