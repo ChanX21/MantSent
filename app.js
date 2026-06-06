@@ -36,7 +36,7 @@ var steps = [
     key: "agentCreated",
     title: "ERC-8004 agent",
     proof: "IdentityRegistry",
-    detail: () => agent.identityStatus === "erc8004-registered" ? "MantSent Treasury Anomaly Monitor is registered through ERC-8004 on Mantle." : "Local demo agent profile is active. ERC-8004 registration is the next identity step."
+    detail: () => agent.identityStatus === "erc8004-registered" ? "MantSent Treasury Anomaly Monitor is registered through ERC-8004 on Mantle." : "Local agent profile is active. ERC-8004 registration is the next identity step."
   },
   {
     key: "walletWatched",

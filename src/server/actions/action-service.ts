@@ -215,6 +215,7 @@ async function resolveAlert(env: RuntimeEnv, action: "expected" | "suspicious"):
 
 function resetDemo(env: RuntimeEnv): AppState {
   return mutateState((state) => {
+    const agentId = env.MANTSENT_AGENT_ID || state.agentId;
     Object.assign(state, {
       agentCreated: false,
       walletWatched: false,
@@ -235,12 +236,12 @@ function resetDemo(env: RuntimeEnv): AppState {
       monitorCursorBlock: 0,
       seenRecipients: [],
       incidents: [],
-      agentId: env.MANTSENT_AGENT_ID || state.agentId,
+      agentId,
       agentUri: env.MANTSENT_AGENT_URI || state.agentUri || defaultAgentUri(env),
       agentRegistrationTxHash: "",
       aiProvider: env.AI_PROVIDER || (env.OPENAI_API_KEY ? "openai" : "template"),
       openAiConfigured: Boolean(env.OPENAI_API_KEY),
-      agentProfile: createAgentProfile(env, state.agentId),
+      agentProfile: createAgentProfile(env, agentId),
     });
   });
 }
