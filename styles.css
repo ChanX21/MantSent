@@ -358,6 +358,22 @@ h3 {
   margin-top: 4px;
 }
 
+.wallet-scope {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.wallet-scope span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .command-list code {
   display: block;
   padding: 10px 12px;

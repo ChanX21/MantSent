@@ -21,8 +21,8 @@ export const singleWalletMonitoringSkill: MonitoringSkill = {
 
 export function createAgentProfile(env: RuntimeEnv, agentId = "1024"): AgentProfile {
   return {
-    id: agentId,
-    name: "MantSent - Mantle Sentinel",
+    id: env.MANTSENT_AGENT_ID || agentId,
+    name: env.MANTSENT_AGENT_NAME || "MantSent - Mantle Sentinel",
     network: Number(env.MANTLE_CHAIN_ID) === 5000 ? "Mantle Mainnet" : "Mantle Sepolia",
     identityStatus: "placeholder",
     skill: singleWalletMonitoringSkill,

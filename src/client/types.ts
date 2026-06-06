@@ -9,6 +9,10 @@ export interface ClientState {
   resolved: boolean;
   outcome: PublicState["outcome"];
   thresholdMnt: number;
+  aiProvider: PublicState["aiProvider"];
+  openAiConfigured: boolean;
+  agentRegistrationTxHash: string;
+  agentUri: string;
   activeView: ViewName;
   online: boolean;
   incidents: PublicState["incidents"];
@@ -16,6 +20,7 @@ export interface ClientState {
 
 export interface AgentViewModel {
   id: string;
+  name: string;
   wallet: string;
   recipient: string;
   tx: string;

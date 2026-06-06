@@ -9,6 +9,10 @@ export const state: ClientState = {
   resolved: false,
   outcome: "Unresolved",
   thresholdMnt: 10,
+  aiProvider: "template",
+  openAiConfigured: false,
+  agentRegistrationTxHash: "",
+  agentUri: "agent-metadata.json",
   activeView: "overview",
   online: false,
   incidents: [],
@@ -16,6 +20,7 @@ export const state: ClientState = {
 
 export const agent: AgentViewModel = {
   id: "1024",
+  name: "MantSent - Mantle Sentinel",
   wallet: "",
   recipient: "",
   tx: "",
@@ -78,10 +83,15 @@ export function applyRemoteState(remote: PublicState): void {
     resolved: remote.resolved,
     outcome: remote.outcome,
     thresholdMnt: remote.thresholdMnt,
+    aiProvider: remote.aiProvider,
+    openAiConfigured: remote.openAiConfigured,
+    agentRegistrationTxHash: remote.agentRegistrationTxHash,
+    agentUri: remote.agentUri,
     incidents: remote.incidents,
   });
   Object.assign(agent, {
     id: remote.agentId || agent.id,
+    name: remote.agentProfile?.name || agent.name,
     skillName: remote.agentProfile?.skill.name || agent.skillName,
     skillDescription: remote.agentProfile?.skill.description || agent.skillDescription,
     wallet: remote.watchedWallet || "",

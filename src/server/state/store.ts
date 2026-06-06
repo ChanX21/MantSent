@@ -15,6 +15,10 @@ const defaultState: AppState = {
   outcome: "Unresolved",
   agentProfile: createAgentProfile({ MANTLE_CHAIN_ID: "5003" }),
   agentId: "1024",
+  agentUri: "agent-metadata.json",
+  agentRegistrationTxHash: "",
+  aiProvider: "template",
+  openAiConfigured: false,
   watchedWallet: "",
   recipient: "",
   policy: null,
@@ -34,6 +38,10 @@ const defaultState: AppState = {
 export function loadState(path = statePath): AppState {
   if (!existsSync(path)) return { ...defaultState };
   const loaded = { ...defaultState, ...JSON.parse(readFileSync(path, "utf8")) } as AppState;
+  loaded.agentUri ||= "agent-metadata.json";
+  loaded.agentRegistrationTxHash ||= "";
+  loaded.aiProvider ||= "template";
+  loaded.openAiConfigured ||= false;
   loaded.incidents = loaded.incidents.map((incident) => ({
     ...incident,
     explanation:

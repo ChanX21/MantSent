@@ -7,7 +7,9 @@ import {
   evaluateAgentTransfer,
 } from "../agent/single-wallet-monitoring-agent.js";
 import { digest } from "../chain/mantle.js";
+import { registerAgentIdentity } from "../chain/erc8004.js";
 import { commitAlertProof, commitOutcomeProof, commitPolicyProof } from "../chain/proofs.js";
+import { updateEnvValue } from "../config/env.js";
 import { createAgentLlmProvider } from "../agent/llm/provider-factory.js";
 import { mutateState, publicState } from "../state/store.js";
 
@@ -22,7 +24,9 @@ export function createActionService(env: RuntimeEnv): ActionService {
   return {
     state: publicState,
     async run(action: ActionName, payload: ActionPayload = {}) {
-      if (action === "create") return createAgent(env);
+      if (action === "create") return createAgent(env, payload);
+      if (action === "register_agent") return registerAgent(env, payload);
+      if (action === "configure_ai") return configureAi(env, payload);
       if (action === "watch") return watchWallet(payload);
       if (action === "policy") return activatePolicy(env, payload);
       if (action === "transfer") return simulateTransfer(env, payload);
@@ -34,10 +38,55 @@ export function createActionService(env: RuntimeEnv): ActionService {
   };
 }
 
-function createAgent(env: RuntimeEnv): AppState {
+function createAgent(env: RuntimeEnv, payload: ActionPayload = {}): AppState {
   return mutateState((state) => {
     state.agentCreated = true;
+    state.agentId = env.MANTSENT_AGENT_ID || state.agentId;
+    const requestedName = payload.name || payload.text;
+    if (requestedName) {
+      env.MANTSENT_AGENT_NAME = requestedName;
+      updateEnvValue("MANTSENT_AGENT_NAME", requestedName);
+    }
     state.agentProfile = createAgentProfile(env, state.agentId);
+    state.aiProvider = env.AI_PROVIDER || (env.OPENAI_API_KEY ? "openai" : "template");
+    state.openAiConfigured = Boolean(env.OPENAI_API_KEY);
+  });
+}
+
+async function registerAgent(env: RuntimeEnv, payload: ActionPayload): Promise<PublicState> {
+  const agentUri = payload.agentUri || payload.text || env.MANTSENT_AGENT_URI || defaultAgentUri(env);
+  const result = await registerAgentIdentity(env, agentUri);
+
+  return mutateState((state) => {
+    state.agentCreated = true;
+    state.agentId = result.agentId;
+    state.agentUri = agentUri;
+    state.agentRegistrationTxHash = result.txHash;
+    state.agentIdentityStatus = "erc8004-registered";
+    state.agentProfile = createAgentProfile(env, result.agentId);
+    state.agentProfile.identityStatus = "erc8004-registered";
+  });
+}
+
+function configureAi(env: RuntimeEnv, payload: ActionPayload): AppState {
+  const provider = payload.provider || (payload.apiKey ? "openai" : "template");
+  if (provider === "openai" && !payload.apiKey && !env.OPENAI_API_KEY) throw new Error("Provide an OpenAI API key with /openai sk-...");
+
+  env.AI_PROVIDER = provider;
+  updateEnvValue("AI_PROVIDER", provider);
+
+  if (payload.apiKey) {
+    env.OPENAI_API_KEY = payload.apiKey;
+    updateEnvValue("OPENAI_API_KEY", payload.apiKey);
+  }
+  if (payload.model) {
+    env.OPENAI_MODEL = payload.model;
+    updateEnvValue("OPENAI_MODEL", payload.model);
+  }
+
+  return mutateState((state) => {
+    state.aiProvider = provider;
+    state.openAiConfigured = Boolean(env.OPENAI_API_KEY);
   });
 }
 
@@ -47,17 +96,44 @@ function watchWallet(payload: ActionPayload): AppState {
     state.agentCreated = true;
     state.walletWatched = true;
     state.watchedWallet = address;
+    state.recipient = "";
+    state.policy = null;
+    state.policyActive = false;
+    state.transferDetected = false;
+    state.resolved = false;
+    state.outcome = "Unresolved";
+    state.evidenceTxHash = "";
+    state.evidenceSource = "demo";
+    state.policyTxHash = "";
+    state.alertTxHash = "";
+    state.outcomeTxHash = "";
+    state.lastAlertHash = "";
+    state.monitorActive = false;
+    state.monitorCursorBlock = 0;
+    state.seenRecipients = [];
+    state.incidents = [];
   });
 }
 
 async function activatePolicy(env: RuntimeEnv, payload: ActionPayload): Promise<PublicState> {
   const current = publicState();
-  if (current.policyActive && current.policyTxHash) return current;
+  if (!current.walletWatched || !current.watchedWallet) throw new Error("Set a real Mantle wallet first with /watch 0x...");
   const policy = activateMonitoringPolicy(payload.text);
 
   const before = mutateState((state) => {
     state.policy = policy;
     state.thresholdMnt = policy.thresholdMnt;
+    state.transferDetected = false;
+    state.resolved = false;
+    state.outcome = "Unresolved";
+    state.evidenceTxHash = "";
+    state.evidenceSource = "demo";
+    state.alertTxHash = "";
+    state.outcomeTxHash = "";
+    state.lastAlertHash = "";
+    state.monitorActive = false;
+    state.monitorCursorBlock = 0;
+    state.incidents = [];
   });
   const proof = await commitPolicyProof(env, before);
 
@@ -159,6 +235,11 @@ function resetDemo(env: RuntimeEnv): AppState {
       monitorCursorBlock: 0,
       seenRecipients: [],
       incidents: [],
+      agentId: env.MANTSENT_AGENT_ID || state.agentId,
+      agentUri: env.MANTSENT_AGENT_URI || state.agentUri || defaultAgentUri(env),
+      agentRegistrationTxHash: "",
+      aiProvider: env.AI_PROVIDER || (env.OPENAI_API_KEY ? "openai" : "template"),
+      openAiConfigured: Boolean(env.OPENAI_API_KEY),
       agentProfile: createAgentProfile(env, state.agentId),
     });
   });
@@ -166,6 +247,12 @@ function resetDemo(env: RuntimeEnv): AppState {
 
 function enableMonitor(): AppState {
   return mutateState((state) => {
+    if (!state.walletWatched || !state.watchedWallet) throw new Error("Set a Mantle wallet first with /watch 0x...");
+    if (!state.policyActive || !state.policy) throw new Error("Commit a policy first with /policy ...");
     state.monitorActive = true;
   });
+}
+
+function defaultAgentUri(env: RuntimeEnv): string {
+  return env.PASSPORT_BASE_URL ? `${env.PASSPORT_BASE_URL.replace(/\/$/, "")}/agent-metadata.json` : "agent-metadata.json";
 }

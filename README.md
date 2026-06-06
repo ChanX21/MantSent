@@ -1,6 +1,6 @@
 # MantSent
 
-MantSent is a Mantle-native treasury anomaly interface for the Turing Test build: a Telegram-style command loop, ERC-8004 agent passport, MNT outflow alert, human outcome, and public proof rail.
+MantSent is a Mantle-native treasury anomaly interface: Telegram is the primary operator surface, while the website is an analytics dashboard for agent identity, AI mode, wallet monitoring, incidents, and proof receipts.
 
 ## Run
 
@@ -21,6 +21,14 @@ npm run env:check
 ```
 
 Secrets are intentionally excluded from git. `DEPLOYER_PRIVATE_KEY` must stay local or in the deployment provider secret store.
+
+Agent defaults can be customized per deployment:
+
+```env
+MANTSENT_AGENT_ID=1024
+MANTSENT_AGENT_NAME=MantSent - Mantle Sentinel
+MANTSENT_AGENT_URI=https://your-domain.example/agent-metadata.json
+```
 
 ### Agent Explanation Provider
 
@@ -65,23 +73,27 @@ Then message the bot configured by `TELEGRAM_BOT_TOKEN`:
 
 ```text
 /start
-/create
+/create My Mantle Risk Agent
+/register
+/openai sk-... gpt-4.1-mini
 /watch 0xYourMantleWallet
 /policy Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.
-/simulate
+/monitor
 /proof
 ```
 
-Inline buttons are also available for the same golden path. `/simulate` commits a demo `AlertCommitted` proof to Mantle; the browser buttons use the same backend.
+Inline buttons are available for setup, ERC-8004 registration, OpenAI setup guidance, wallet changes, and proof links. `/simulate` is intentionally demo-only; live alerts come from the Mantle monitor after `/watch`, `/policy`, and `/monitor`.
 
 ## Product Flow
 
-1. Create the ERC-8004 MantSent agent.
-2. Watch one Mantle wallet.
-3. Commit a policy for MNT outflows greater than 10 to first-seen recipients.
-4. Trigger a controlled MNT transfer.
-5. Resolve the alert as expected or suspicious.
-6. Show the passport page with the identity, policy, alert, and outcome proof trail.
+1. Create a named MantSent agent in Telegram.
+2. Register the agent through the configured ERC-8004 Identity Registry.
+3. Optionally add an OpenAI API key for richer alert explanations.
+4. Watch one real Mantle wallet.
+5. Commit a policy for MNT outflows greater than the threshold to first-seen recipients.
+6. Enable live Mantle monitoring.
+7. Resolve matching alerts as expected or suspicious in Telegram.
+8. Use the website to inspect analytics, incident history, agent posture, and proof receipts.
 
 ## Project Map
 

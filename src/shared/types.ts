@@ -56,6 +56,10 @@ export interface AppState {
   outcome: OutcomeLabel;
   agentProfile: AgentProfile;
   agentId: string;
+  agentUri: string;
+  agentRegistrationTxHash: string;
+  aiProvider: AiProvider;
+  openAiConfigured: boolean;
   watchedWallet: string;
   recipient: string;
   policy: PolicyRule | null;
@@ -87,6 +91,9 @@ export interface RuntimeEnv {
   PASSPORT_BASE_URL?: string;
   MANTLE_LOGO_URL?: string;
   MANTLE_TELEGRAM_IMAGE_PATH?: string;
+  MANTSENT_AGENT_ID?: string;
+  MANTSENT_AGENT_NAME?: string;
+  MANTSENT_AGENT_URI?: string;
   AI_PROVIDER?: AiProvider;
   OPENAI_MODEL?: string;
   OPENAI_API_KEY?: string;
@@ -94,12 +101,27 @@ export interface RuntimeEnv {
   OLLAMA_MODEL?: string;
 }
 
-export type ActionName = "create" | "watch" | "policy" | "transfer" | "expected" | "suspicious" | "reset" | "monitor";
+export type ActionName =
+  | "create"
+  | "register_agent"
+  | "configure_ai"
+  | "watch"
+  | "policy"
+  | "transfer"
+  | "expected"
+  | "suspicious"
+  | "reset"
+  | "monitor";
 
 export interface ActionPayload {
   action?: ActionName;
   address?: string;
   text?: string;
+  name?: string;
+  provider?: AiProvider;
+  apiKey?: string;
+  model?: string;
+  agentUri?: string;
   evidenceTxHash?: string;
   recipient?: string;
   force?: boolean;

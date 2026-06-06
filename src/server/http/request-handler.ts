@@ -24,6 +24,7 @@ export function createRequestHandler({ env, actions, telegram }: { env: RuntimeE
 
     try {
       if (url.pathname === "/api/state") return json(res, 200, actions.state());
+      if (url.pathname === "/agent-metadata.json") return json(res, 200, agentMetadata(actions));
       if (url.pathname === "/api/action" && req.method === "POST") {
         const body = (await readJson(req)) as ActionPayload;
         if (!body.action) return json(res, 400, { error: "Missing action" });
@@ -39,6 +40,24 @@ export function createRequestHandler({ env, actions, telegram }: { env: RuntimeE
     }
 
     serveStatic(url, res);
+  };
+}
+
+function agentMetadata(actions: ActionService): unknown {
+  const state = actions.state();
+  return {
+    name: state.agentProfile.name,
+    description: state.agentProfile.skill.description,
+    agentId: state.agentId,
+    identityStatus: state.agentIdentityStatus,
+    network: state.agentProfile.network,
+    capabilities: state.agentProfile.skill.capabilities,
+    service: {
+      type: "telegram",
+      endpoint: "https://t.me/MantSentBot",
+    },
+    watchedWallet: state.watchedWallet || null,
+    proofPage: state.agentUri,
   };
 }
 
