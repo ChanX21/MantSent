@@ -3,17 +3,21 @@ import { proofValue, short, txLink } from "./format.js";
 import type { PublicState } from "./types.js";
 
 export function alertCard(): string {
+  const latest = state.incidents[0];
+  const amount = latest?.outflowAmountMnt || "Unknown";
+  const recipient = latest?.recipient || agent.recipient || "Pending";
+  const evidence = latest?.evidenceTxHash || agent.tx;
   return `
     <div class="alert-card">
       <div class="alert-top">
         <span>CRITICAL MANTLE TREASURY ALERT</span>
-        <strong>25 MNT</strong>
+        <strong>${amount} MNT</strong>
       </div>
       <p>Large outflow to a first-seen recipient may indicate an unauthorized payout or compromised signer action.</p>
       <div class="alert-facts">
-        <span>Recipient ${agent.recipient}</span>
-        <span>Policy >10 MNT + new recipient</span>
-        <span>Evidence ${short(agent.tx)}</span>
+        <span>Recipient ${recipient}</span>
+        <span>Policy >${state.thresholdMnt} MNT + new recipient</span>
+        <span>Evidence ${short(evidence)}</span>
       </div>
     </div>
   `;

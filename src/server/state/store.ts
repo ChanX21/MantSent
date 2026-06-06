@@ -3,6 +3,7 @@ import type { AppState, PublicState } from "../../shared/types.js";
 import { createAgentProfile } from "../agent/single-wallet-monitoring-agent.js";
 
 const statePath = "data/mantsent-state.json";
+const legacyDemoWallet = "0x7F2C2fbb1d2E4b6e6F8E45b902399D8A3C02a91E";
 
 const defaultState: AppState = {
   agentCreated: false,
@@ -42,6 +43,7 @@ export function loadState(path = statePath): AppState {
   loaded.agentRegistrationTxHash ||= "";
   loaded.aiProvider ||= "template";
   loaded.openAiConfigured ||= false;
+  sanitizeLegacyDemoState(loaded);
   loaded.incidents = loaded.incidents.map((incident) => ({
     ...incident,
     explanation:
@@ -53,6 +55,34 @@ export function loadState(path = statePath): AppState {
     source: incident.source || loaded.evidenceSource,
   }));
   return loaded;
+}
+
+function sanitizeLegacyDemoState(state: AppState): void {
+  if (String(process.env.MANTSENT_ENABLE_DEMO_MODE || "").toLowerCase() === "true") return;
+  const hasLegacyDemoWallet = state.watchedWallet.toLowerCase() === legacyDemoWallet.toLowerCase();
+  const hasDemoOnlySignal = state.evidenceSource === "demo" || state.incidents.some((incident) => incident.source === "demo");
+  if (!hasLegacyDemoWallet && !hasDemoOnlySignal) return;
+
+  Object.assign(state, {
+    walletWatched: false,
+    policyActive: false,
+    monitorActive: false,
+    transferDetected: false,
+    resolved: false,
+    outcome: "Unresolved",
+    watchedWallet: "",
+    recipient: "",
+    policy: null,
+    evidenceTxHash: "",
+    evidenceSource: "demo",
+    policyTxHash: "",
+    alertTxHash: "",
+    outcomeTxHash: "",
+    lastAlertHash: "",
+    monitorCursorBlock: 0,
+    seenRecipients: [],
+    incidents: [],
+  });
 }
 
 export function saveState(state: AppState, path = statePath): void {

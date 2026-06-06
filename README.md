@@ -84,6 +84,12 @@ Then message the bot configured by `TELEGRAM_BOT_TOKEN`:
 
 Inline buttons are available for setup, ERC-8004 registration, OpenAI setup guidance, wallet changes, and proof links. `/simulate` is intentionally demo-only; live alerts come from the Mantle monitor after `/watch`, `/policy`, and `/monitor`.
 
+Demo shortcuts are disabled by default. To expose `/demo` and demo wallet buttons in a non-production environment, set:
+
+```env
+MANTSENT_ENABLE_DEMO_MODE=true
+```
+
 ## Product Flow
 
 1. Create a named MantSent agent in Telegram.

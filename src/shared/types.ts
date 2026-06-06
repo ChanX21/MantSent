@@ -94,6 +94,7 @@ export interface RuntimeEnv {
   MANTSENT_AGENT_ID?: string;
   MANTSENT_AGENT_NAME?: string;
   MANTSENT_AGENT_URI?: string;
+  MANTSENT_ENABLE_DEMO_MODE?: string;
   AI_PROVIDER?: AiProvider;
   OPENAI_MODEL?: string;
   OPENAI_API_KEY?: string;
@@ -104,6 +105,7 @@ export interface RuntimeEnv {
 export type ActionName =
   | "create"
   | "register_agent"
+  | "deploy_agent"
   | "configure_ai"
   | "watch"
   | "policy"

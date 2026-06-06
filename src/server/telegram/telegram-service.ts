@@ -10,9 +10,12 @@ import { defaultMantleLogoUrl, defaultTelegramImagePath, mantleProofTagline, tel
 const demoWallet = "0x7f2c2fbb1d2e4b6e6f8e45b902399d8a3c02a91e";
 const demoPolicy = "Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.";
 const setupText =
-  "<b>Set a real Mantle wallet</b>\n" +
-  "Send <code>/watch 0x...</code> with the wallet address to monitor.\n\n" +
-  "Then commit a policy with <code>/policy Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.</code>";
+  "<b>Set up live wallet monitoring</b>\n" +
+  "1. <code>/deploy My Agent Name</code>\n" +
+  "2. <code>/openai sk-... gpt-4.1-mini</code> optional\n" +
+  "3. <code>/watch 0xYourMantleWallet</code>\n" +
+  "4. <code>/policy Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.</code>\n" +
+  "5. <code>/monitor</code>";
 const aiSetupText =
   "<b>Optional AI upgrade</b>\n" +
   "Send <code>/openai sk-... gpt-4.1-mini</code> to use OpenAI for richer agent explanations.\n\n" +
@@ -46,12 +49,14 @@ export function createTelegramService({
   chainId,
   mantleLogoUrl = defaultMantleLogoUrl,
   telegramImagePath = defaultTelegramImagePath,
+  demoMode = false,
 }: {
   botToken?: string;
   actions: ActionService;
   chainId?: string;
   mantleLogoUrl?: string;
   telegramImagePath?: string;
+  demoMode?: boolean;
 }): TelegramService {
   async function call<T>(method: string, body: Record<string, unknown>): Promise<T> {
     if (!botToken) throw new Error("TELEGRAM_BOT_TOKEN is not set.");
@@ -83,7 +88,7 @@ export function createTelegramService({
       text: statusText(state, chainId),
       parse_mode: "HTML",
       disable_web_page_preview: true,
-      reply_markup: { inline_keyboard: buttonsFor(state, chainId) },
+      reply_markup: { inline_keyboard: buttonsFor(state, chainId, demoMode) },
     });
   }
 
@@ -104,12 +109,22 @@ export function createTelegramService({
   async function handleCallback(callback: NonNullable<TelegramUpdate["callback_query"]>, chatId: number): Promise<void> {
     await call("answerCallbackQuery", { callback_query_id: callback.id });
     const action = callback.data;
+    if (["watch_demo", "policy_demo", "transfer_demo"].includes(action) && !demoMode) {
+      await call("sendMessage", {
+        chat_id: chatId,
+        text: "<b>Demo controls are disabled.</b>\nThis deployment is configured for real agent and wallet monitoring only.",
+        parse_mode: "HTML",
+      });
+      await sendStatus(chatId);
+      return;
+    }
 
-    if (action === "watch_demo") await actions.run("watch", { address: demoWallet });
-    else if (action === "policy_demo") await actions.run("policy", { text: demoPolicy });
-    else if (action === "transfer_demo") await actions.run("transfer", {});
+    if (action === "watch_demo" && demoMode) await actions.run("watch", { address: demoWallet });
+    else if (action === "policy_demo" && demoMode) await actions.run("policy", { text: demoPolicy });
+    else if (action === "transfer_demo" && demoMode) await actions.run("transfer", {});
     else if (action === "monitor_on") await actions.run("monitor", {});
     else if (action === "register_agent") await actions.run("register_agent", {});
+    else if (action === "deploy_agent") await actions.run("deploy_agent", {});
     else if (action === "ai_setup") {
       await call("sendMessage", { chat_id: chatId, text: aiSetupText, parse_mode: "HTML" });
     }
@@ -145,6 +160,14 @@ export function createTelegramService({
       } else if (command === "/create") {
         await actions.run("create", { name: args || undefined });
         await sendStatus(chatId);
+      } else if (command === "/deploy") {
+        await call("sendMessage", {
+          chat_id: chatId,
+          text: "<b>Deploying agent identity.</b>\nCreating the local profile and registering it through ERC-8004 on Mantle.",
+          parse_mode: "HTML",
+        });
+        await actions.run("deploy_agent", { name: args || undefined });
+        await sendStatus(chatId);
       } else if (command === "/register") {
         await call("sendMessage", { chat_id: chatId, text: "<b>Registering ERC-8004 agent on Mantle.</b>\nThis can take a moment.", parse_mode: "HTML" });
         await actions.run("register_agent", { agentUri: args || undefined });
@@ -178,7 +201,15 @@ export function createTelegramService({
         await call("sendMessage", { chat_id: chatId, text: "<b>Securing policy proof on Mantle.</b>\nThis can take a moment.", parse_mode: "HTML" });
         await actions.run("policy", { text: args });
         await sendStatus(chatId);
-      } else if (command === "/simulate") {
+      } else if (command === "/simulate" || command === "/demo") {
+        if (!demoMode) {
+          await call("sendMessage", {
+            chat_id: chatId,
+            text: "<b>Demo mode is disabled.</b>\nThis deployment is configured for real wallets only. Use <code>/watch</code>, <code>/policy</code>, and <code>/monitor</code>.",
+            parse_mode: "HTML",
+          });
+          return;
+        }
         await call("sendMessage", { chat_id: chatId, text: "<b>Demo simulation only.</b>\nSecuring a demo alert proof on Mantle. This does not represent a live wallet transfer.", parse_mode: "HTML" });
         await actions.run("transfer", {});
         await sendStatus(chatId);
@@ -204,7 +235,7 @@ export function createTelegramService({
         await call("sendMessage", {
           chat_id: chatId,
           text:
-            "<b>Commands</b>\n/create [agent name]\n/register [agentURI]\n/openai sk-... [model]\n/watch 0x...\n/policy alert me if more than 10 MNT leaves\n/monitor\n/proof\n/reset\n/redeploy\n\n<code>/simulate</code> is demo-only.",
+            `<b>Commands</b>\n/deploy [agent name]\n/create [agent name]\n/register [agentURI]\n/openai sk-... [model]\n/watch 0x...\n/policy alert me if more than 10 MNT leaves\n/monitor\n/proof\n/reset\n/redeploy${demoMode ? "\n/demo" : ""}`,
           parse_mode: "HTML",
         });
       }
@@ -279,6 +310,9 @@ Identity: ${state.agentIdentityStatus === "erc8004-registered" ? "ERC-8004 regis
 AI: ${state.aiProvider === "openai" && state.openAiConfigured ? "OpenAI enhanced" : escapeHtml(state.aiProvider)}
 Scope: One Mantle wallet
 
+<b>Setup</b>
+${setupProgress(state)}
+
 <b>Monitoring</b>
 Wallet: ${state.watchedWallet ? `<code>${escapeHtml(state.watchedWallet)}</code>` : "Not set"}
 Policy: ${state.policyActive ? `&gt;${state.thresholdMnt} MNT to a new recipient` : "Not set"}
@@ -314,8 +348,13 @@ function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-function buttonsFor(state: PublicState, chainId?: string): InlineKeyboard {
-  if (!state.agentCreated) return [[{ text: "Create Agent", callback_data: "create" }]];
+function buttonsFor(state: PublicState, chainId?: string, demoMode = false): InlineKeyboard {
+  if (!state.agentCreated) {
+    return [
+      [{ text: "Deploy & Register Agent", callback_data: "deploy_agent" }],
+      [{ text: "Create Local Agent", callback_data: "create" }],
+    ];
+  }
   if (state.agentIdentityStatus !== "erc8004-registered") {
     return [
       [{ text: "Register ERC-8004 Agent", callback_data: "register_agent" }],
@@ -325,32 +364,32 @@ function buttonsFor(state: PublicState, chainId?: string): InlineKeyboard {
     ];
   }
   if (!state.walletWatched) {
-    return [
+    const rows: InlineKeyboard = [
       [{ text: "Set Real Wallet", callback_data: "wallet_setup" }],
       [{ text: "Add OpenAI Key", callback_data: "ai_setup" }],
-      [{ text: "Use Demo Wallet", callback_data: "watch_demo" }],
       managementButtons(),
     ];
+    if (demoMode) rows.splice(2, 0, [{ text: "Use Demo Wallet", callback_data: "watch_demo" }]);
+    return rows;
   }
   if (!state.policyActive) {
-    return [
+    const rows: InlineKeyboard = [
       [{ text: "How to Set Policy", callback_data: "wallet_setup" }],
-      [{ text: "Use Sample Policy", callback_data: "policy_demo" }],
       managementButtons(),
     ];
+    if (demoMode) rows.splice(1, 0, [{ text: "Use Sample Policy", callback_data: "policy_demo" }]);
+    return rows;
   }
   if (!state.monitorActive) {
-    return [
+    const rows: InlineKeyboard = [
       [{ text: "Enable Live Monitor", callback_data: "monitor_on" }],
-      [{ text: "Run Demo Outflow", callback_data: "transfer_demo" }],
       managementButtons(),
     ];
+    if (demoMode) rows.splice(1, 0, [{ text: "Run Demo Outflow", callback_data: "transfer_demo" }]);
+    return rows;
   }
   if (!state.transferDetected) {
-    return [
-      [{ text: "Run Demo Outflow", callback_data: "transfer_demo" }],
-      managementButtons(),
-    ];
+    return demoMode ? [[{ text: "Run Demo Outflow", callback_data: "transfer_demo" }], managementButtons()] : [managementButtons()];
   }
   const rows: InlineKeyboard = [
     [
@@ -365,6 +404,17 @@ function buttonsFor(state: PublicState, chainId?: string): InlineKeyboard {
   if (proofButtons.length) rows.push(proofButtons);
   rows.push(managementButtons());
   return rows;
+}
+
+function setupProgress(state: PublicState): string {
+  return [
+    `${state.agentCreated ? "Ready" : "Pending"} Agent profile`,
+    `${state.agentIdentityStatus === "erc8004-registered" ? "Ready" : "Pending"} ERC-8004 registration`,
+    `${state.openAiConfigured ? "Ready" : "Optional"} AI explanations`,
+    `${state.walletWatched ? "Ready" : "Pending"} Wallet`,
+    `${state.policyActive ? "Ready" : "Pending"} Policy`,
+    `${state.monitorActive ? "Live" : "Pending"} Monitor`,
+  ].join("\n");
 }
 
 function managementButtons(): InlineButton[] {

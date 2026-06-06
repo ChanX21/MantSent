@@ -26,6 +26,7 @@ export function createActionService(env: RuntimeEnv): ActionService {
     async run(action: ActionName, payload: ActionPayload = {}) {
       if (action === "create") return createAgent(env, payload);
       if (action === "register_agent") return registerAgent(env, payload);
+      if (action === "deploy_agent") return deployAgent(env, payload);
       if (action === "configure_ai") return configureAi(env, payload);
       if (action === "watch") return watchWallet(payload);
       if (action === "policy") return activatePolicy(env, payload);
@@ -66,6 +67,11 @@ async function registerAgent(env: RuntimeEnv, payload: ActionPayload): Promise<P
     state.agentProfile = createAgentProfile(env, result.agentId);
     state.agentProfile.identityStatus = "erc8004-registered";
   });
+}
+
+async function deployAgent(env: RuntimeEnv, payload: ActionPayload): Promise<PublicState> {
+  createAgent(env, payload);
+  return registerAgent(env, payload);
 }
 
 function configureAi(env: RuntimeEnv, payload: ActionPayload): AppState {
@@ -144,6 +150,7 @@ async function activatePolicy(env: RuntimeEnv, payload: ActionPayload): Promise<
 }
 
 async function simulateTransfer(env: RuntimeEnv, payload: ActionPayload): Promise<PublicState> {
+  if (!demoModeEnabled(env)) throw new Error("Demo simulation is disabled in production mode.");
   const current = publicState();
   if (current.transferDetected && current.alertTxHash && !payload.force) return current;
 
@@ -256,4 +263,8 @@ function enableMonitor(): AppState {
 
 function defaultAgentUri(env: RuntimeEnv): string {
   return env.PASSPORT_BASE_URL ? `${env.PASSPORT_BASE_URL.replace(/\/$/, "")}/agent-metadata.json` : "agent-metadata.json";
+}
+
+function demoModeEnabled(env: RuntimeEnv): boolean {
+  return String(env.MANTSENT_ENABLE_DEMO_MODE || "").toLowerCase() === "true";
 }

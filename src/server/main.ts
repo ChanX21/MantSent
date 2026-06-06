@@ -23,6 +23,7 @@ const telegram = createTelegramService({
   chainId: env.MANTLE_CHAIN_ID,
   mantleLogoUrl: env.MANTLE_LOGO_URL,
   telegramImagePath: env.MANTLE_TELEGRAM_IMAGE_PATH || defaultTelegramImagePath,
+  demoMode: String(env.MANTSENT_ENABLE_DEMO_MODE || "").toLowerCase() === "true",
 });
 const handler = createRequestHandler({ env, actions, telegram });
 

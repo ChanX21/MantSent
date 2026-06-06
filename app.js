@@ -130,17 +130,21 @@ function proofValue(hash) {
 
 // src/client/components.ts
 function alertCard() {
+  const latest = state.incidents[0];
+  const amount = latest?.outflowAmountMnt || "Unknown";
+  const recipient = latest?.recipient || agent.recipient || "Pending";
+  const evidence = latest?.evidenceTxHash || agent.tx;
   return `
     <div class="alert-card">
       <div class="alert-top">
         <span>CRITICAL MANTLE TREASURY ALERT</span>
-        <strong>25 MNT</strong>
+        <strong>${amount} MNT</strong>
       </div>
       <p>Large outflow to a first-seen recipient may indicate an unauthorized payout or compromised signer action.</p>
       <div class="alert-facts">
-        <span>Recipient ${agent.recipient}</span>
-        <span>Policy >10 MNT + new recipient</span>
-        <span>Evidence ${short(agent.tx)}</span>
+        <span>Recipient ${recipient}</span>
+        <span>Policy >${state.thresholdMnt} MNT + new recipient</span>
+        <span>Evidence ${short(evidence)}</span>
       </div>
     </div>
   `;
@@ -251,14 +255,14 @@ function overviewView() {
         <aside class="telegram-panel">
           <span class="eyebrow">Primary workflow</span>
           <h2>Operate from Telegram</h2>
-          <p>Use Telegram to create or redeploy the agent, change wallets, set policy, enable monitoring, and resolve outcomes. This website is analytics-only.</p>
+          <p>Use Telegram to deploy and register agents, add optional OpenAI intelligence, change wallets, set policies, enable monitoring, and resolve outcomes. This website is analytics-only.</p>
           <div class="wallet-scope">
             <span>Watched wallet</span>
             <code>${agent.wallet || "Not configured"}</code>
           </div>
           <div class="command-list">
             <code>/start</code>
-            <code>/create Agent Name</code>
+            <code>/deploy Agent Name</code>
             <code>/register</code>
             <code>/openai sk-...</code>
             <code>/watch 0x...</code>
@@ -366,7 +370,7 @@ function noAlertState() {
     <div class="no-alert-state">
       <span class="eyebrow">No active alert</span>
       <h3>Awaiting a policy-matching Mantle outflow.</h3>
-      <p>When Telegram enables monitoring for a wallet, matching outflows will appear here as analytics events with proof receipts.</p>
+      <p>After Telegram enables monitoring for a wallet, matching Mantle outflows will appear here as analytics events with proof receipts.</p>
     </div>
   `;
 }
@@ -377,7 +381,7 @@ function evidenceLabel() {
 function evidenceDetail() {
   if (!state.transferDetected) return "No alert has been detected for the active wallet and policy.";
   if (agent.evidenceSource === "mantle-transaction") return "Latest alert is backed by a confirmed Mantle transaction.";
-  return "Latest signal is demo/simulated and should not be treated as live evidence.";
+  return "Latest signal was generated outside the live monitor and should not be treated as confirmed wallet activity.";
 }
 
 // src/shared/branding.ts
