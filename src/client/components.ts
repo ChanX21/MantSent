@@ -1,17 +1,6 @@
 import { agent, state } from "./state.js";
-import { gate, proofValue, short, txLink } from "./format.js";
-import type { ActionName } from "./types.js";
-
-export function chatLine(kind: "user" | "bot", text: string, meta: string[] = []): string {
-  return `
-    <div class="chat-line ${kind}">
-      <div class="bubble">
-        <p>${text}</p>
-        ${meta.length ? `<ul>${meta.map((item) => `<li>${item}</li>`).join("")}</ul>` : ""}
-      </div>
-    </div>
-  `;
-}
+import { proofValue, short, txLink } from "./format.js";
+import type { PublicState } from "./types.js";
 
 export function alertCard(): string {
   return `
@@ -26,17 +15,8 @@ export function alertCard(): string {
         <span>Policy >10 MNT + new recipient</span>
         <span>Evidence ${short(agent.tx)}</span>
       </div>
-      <div class="alert-actions">
-        <button data-action="expected" ${gate(state.transferDetected)}>Expected Transfer</button>
-        <button data-action="suspicious" ${gate(state.transferDetected)}>Suspicious Activity</button>
-        <button data-view="passport">View Proof</button>
-      </div>
     </div>
   `;
-}
-
-export function actionButton(action: ActionName, label: string, enabled: boolean): string {
-  return `<button class="action-button" data-action="${action}" ${enabled ? "" : "disabled"}>${label}</button>`;
 }
 
 export function metric(label: string, value: number): string {
@@ -44,6 +24,50 @@ export function metric(label: string, value: number): string {
     <div class="metric">
       <span>${label}</span>
       <strong>${value}</strong>
+    </div>
+  `;
+}
+
+export function analyticsCard(title: string, value: string, detail: string, tone: "good" | "warn" | "danger" | "neutral" = "neutral"): string {
+  return `
+    <article class="analytics-card ${tone}">
+      <span>${title}</span>
+      <strong>${value}</strong>
+      <p>${detail}</p>
+    </article>
+  `;
+}
+
+export function signalTable(incidents: PublicState["incidents"]): string {
+  if (!incidents.length) {
+    return `
+      <div class="empty-state">
+        <strong>No incidents recorded</strong>
+        <p>Telegram remains the primary workflow for wallet setup, policies, and outcome review.</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="signal-table">
+      <div class="signal-row head">
+        <span>Severity</span>
+        <span>Outcome</span>
+        <span>Amount</span>
+        <span>Evidence</span>
+      </div>
+      ${incidents
+        .map(
+          (incident) => `
+            <div class="signal-row">
+              <strong>${incident.severity}</strong>
+              <span>${incident.outcome}</span>
+              <span>${incident.outflowAmountMnt} MNT</span>
+              <code>${short(incident.evidenceTxHash)}</code>
+            </div>
+          `,
+        )
+        .join("")}
     </div>
   `;
 }

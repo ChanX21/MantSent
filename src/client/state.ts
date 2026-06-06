@@ -8,7 +8,8 @@ export const state: ClientState = {
   transferDetected: false,
   resolved: false,
   outcome: "Unresolved",
-  activeView: "command",
+  thresholdMnt: 10,
+  activeView: "overview",
   online: false,
   incidents: [],
 };
@@ -76,6 +77,7 @@ export function applyRemoteState(remote: PublicState): void {
     transferDetected: remote.transferDetected,
     resolved: remote.resolved,
     outcome: remote.outcome,
+    thresholdMnt: remote.thresholdMnt,
     incidents: remote.incidents,
   });
   Object.assign(agent, {

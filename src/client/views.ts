@@ -1,56 +1,69 @@
-import { actionButton, alertCard, chatLine, metric, proofCard, proofMeta, statusBadge } from "./components.js";
+import { alertCard, analyticsCard, metric, proofCard, signalTable, statusBadge } from "./components.js";
 import { cls, proofValue, short } from "./format.js";
 import { agent, progress, state, steps } from "./state.js";
 import type { StepViewModel } from "./types.js";
 
-export function commandView(): string {
+export function overviewView(): string {
+  const alerts = state.incidents.length;
+  const resolved = state.incidents.filter((incident) => incident.outcome !== "Unresolved").length;
+  const suspicious = state.incidents.filter((incident) => incident.outcome === "Suspicious Activity").length;
+  const latestIncident = state.incidents[0];
+  const monitorTone = state.monitorActive ? "good" : "warn";
+  const evidenceTone = agent.evidenceSource === "mantle-transaction" ? "good" : "warn";
+
   return `
-    <section class="workspace">
-      <div class="terminal-panel">
-        <div class="panel-head">
-          <div>
-            <span class="eyebrow">Telegram runtime</span>
-            <h2>MantSent command loop</h2>
-          </div>
-          <span class="pill ${cls(state.online)}">Backend ${state.online ? "online" : "offline"}</span>
-        </div>
-        <div class="chat-stack">
-          ${chatLine("user", "/create")}
-          ${state.agentCreated ? chatLine("bot", "Your Mantle Sentinel is live.", [`Agent profile #${agent.id}`, agent.skillName, agent.identityStatus === "erc8004-registered" ? "ERC-8004 registered" : "Demo identity pending ERC-8004 registration", "Passport ready"]) : ""}
-          ${state.agentCreated ? chatLine("user", `/watch ${agent.wallet || "0xTreasuryWallet"}`) : ""}
-          ${state.walletWatched ? chatLine("bot", "Watching this Mantle wallet.", ["Set a risk rule with /policy"]) : ""}
-          ${state.walletWatched ? chatLine("user", "/policy Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.") : ""}
-          ${state.policyActive ? chatLine("bot", "Policy active on Mantle.", ["Asset MNT", "Trigger outflow greater than 10 MNT", "Escalation new recipient = Critical", proofMeta("Proof", agent.policyTx)]) : ""}
-          ${state.transferDetected ? alertCard() : ""}
-          ${state.resolved ? chatLine("bot", "Outcome recorded on Mantle.", [`Label ${state.outcome}`, proofMeta("Proof", agent.outcomeTx)]) : ""}
-        </div>
+    <section class="analytics-overview">
+      <div class="overview-grid">
+        ${analyticsCard("Monitor", state.monitorActive ? "Live" : "Offline", state.monitorActive ? "Mantle polling is active for the watched wallet." : "Enable monitoring from Telegram to begin scanning confirmed MNT outflows.", monitorTone)}
+        ${analyticsCard("Evidence", agent.evidenceSource === "mantle-transaction" ? "Real tx" : "Demo", agent.evidenceSource === "mantle-transaction" ? "Latest alert is backed by a confirmed Mantle transaction." : "Latest signal is demo/simulated and should not be treated as live evidence.", evidenceTone)}
+        ${analyticsCard("Policy", state.policyActive ? `>${state.thresholdMnt} MNT` : "Not set", state.policyActive ? "Escalates first-seen recipients above the configured outflow threshold." : "Set the wallet policy in Telegram.", state.policyActive ? "good" : "warn")}
+        ${analyticsCard("Outcome", state.outcome, state.resolved ? "Latest alert has an operator-reviewed outcome." : "Awaiting operator review in Telegram.", state.resolved ? "good" : "neutral")}
       </div>
 
-      <aside class="operator-panel">
-        <div class="panel-head compact">
-          <span class="eyebrow">Golden path</span>
-          <span>${progress()}%</span>
+      <div class="analytics-layout">
+        <section class="insight-panel">
+          <div class="panel-head">
+            <div>
+              <span class="eyebrow">Signal intelligence</span>
+              <h2>Wallet risk posture</h2>
+            </div>
+            <span class="pill ${cls(state.online)}">Backend ${state.online ? "online" : "offline"}</span>
+          </div>
+          <div class="posture-body">
+            ${state.transferDetected ? alertCard() : noAlertState()}
+            <div class="signal-summary">
+              ${metric("Incidents", alerts)}
+              ${metric("Resolved", resolved)}
+              ${metric("Suspicious", suspicious)}
+              ${metric("Completion", progress())}
+            </div>
+          </div>
+        </section>
+
+        <aside class="telegram-panel">
+          <span class="eyebrow">Primary workflow</span>
+          <h2>Operate from Telegram</h2>
+          <p>Use Telegram to create or redeploy the agent, change wallets, set policy, enable monitoring, and resolve outcomes. This website is analytics-only.</p>
+          <div class="command-list">
+            <code>/start</code>
+            <code>/watch 0x...</code>
+            <code>/policy ...</code>
+            <code>/monitor</code>
+            <code>/proof</code>
+            <code>/reset</code>
+          </div>
+        </aside>
+      </div>
+
+      <section class="insight-panel">
+        <div class="panel-head">
+          <div>
+            <span class="eyebrow">Incident ledger</span>
+            <h2>Recent signals</h2>
+          </div>
         </div>
-        <div class="progress-track"><span style="width:${progress()}%"></span></div>
-        <div class="status-stack">
-          ${statusBadge("Identity", agent.identityStatus === "erc8004-registered" ? "ERC-8004" : "Demo profile", agent.identityStatus === "erc8004-registered" ? "good" : "warn")}
-          ${statusBadge("Skill", "One wallet", "good")}
-          ${statusBadge("Monitor", state.monitorActive ? "Live polling" : "Off", state.monitorActive ? "good" : "warn")}
-          ${statusBadge("Evidence", agent.evidenceSource === "mantle-transaction" ? "Real tx" : "Demo hash", agent.evidenceSource === "mantle-transaction" ? "good" : "warn")}
-        </div>
-        <div class="action-grid">
-          ${actionButton("create", "Create Agent", true)}
-          ${actionButton("watch", "Watch Wallet", state.agentCreated)}
-          ${actionButton("policy", "Commit Policy", state.walletWatched)}
-          ${actionButton("monitor", "Enable Monitor", state.policyActive)}
-          ${actionButton("transfer", "Trigger MNT Outflow", state.policyActive)}
-        </div>
-        <div class="resolve-row">
-          ${actionButton("expected", "Expected", state.transferDetected)}
-          ${actionButton("suspicious", "Suspicious", state.transferDetected)}
-        </div>
-        <button class="ghost-button" data-action="reset">Reset demo state</button>
-      </aside>
+        ${signalTable(state.incidents)}
+      </section>
     </section>
   `;
 }
@@ -137,5 +150,15 @@ function timelineItem(step: StepViewModel): string {
         <p>${step.detail()}</p>
       </div>
     </article>
+  `;
+}
+
+function noAlertState(): string {
+  return `
+    <div class="no-alert-state">
+      <span class="eyebrow">No active alert</span>
+      <h3>Awaiting a policy-matching Mantle outflow.</h3>
+      <p>When Telegram enables monitoring for a wallet, matching outflows will appear here as analytics events with proof receipts.</p>
+    </div>
   `;
 }

@@ -1,4 +1,4 @@
-import { commandView, evidenceView, passportView } from "./views.js";
+import { evidenceView, overviewView, passportView } from "./views.js";
 import { progress, state } from "./state.js";
 import type { ViewName } from "./types.js";
 import { defaultMantleLogoUrl, mantleProofTagline } from "../shared/branding.js";
@@ -8,7 +8,7 @@ if (!app) throw new Error("Missing #app mount node");
 const mount = app;
 
 export function render(): void {
-  const view = state.activeView === "passport" ? passportView() : state.activeView === "evidence" ? evidenceView() : commandView();
+  const view = state.activeView === "passport" ? passportView() : state.activeView === "evidence" ? evidenceView() : overviewView();
 
   mount.innerHTML = `
     <div class="app-shell">
@@ -23,9 +23,9 @@ export function render(): void {
           </div>
         </div>
         <nav class="view-tabs" aria-label="MantSent views">
-          <button class="${state.activeView === "command" ? "active" : ""}" data-view="command">Command</button>
-          <button class="${state.activeView === "passport" ? "active" : ""}" data-view="passport">Passport</button>
-          <button class="${state.activeView === "evidence" ? "active" : ""}" data-view="evidence">Evidence</button>
+          <button class="${state.activeView === "overview" ? "active" : ""}" data-view="overview">Overview</button>
+          <button class="${state.activeView === "passport" ? "active" : ""}" data-view="passport">Agent</button>
+          <button class="${state.activeView === "evidence" ? "active" : ""}" data-view="evidence">Proofs</button>
         </nav>
         <div class="network-chip">
           <span></span>
@@ -34,8 +34,8 @@ export function render(): void {
       </header>
       <section class="hero-band">
         <div>
-          <span class="eyebrow">MNT anomaly intelligence</span>
-          <h1>Mantle treasury alerts with proof secured on Mantle.</h1>
+          <span class="eyebrow">Analytics command center</span>
+          <h1>Mantle wallet risk analytics with proof secured on Mantle.</h1>
         </div>
         <div class="hero-proof">
           <small>Verified flow</small>

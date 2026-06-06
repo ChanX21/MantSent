@@ -7,7 +7,8 @@ var state = {
   transferDetected: false,
   resolved: false,
   outcome: "Unresolved",
-  activeView: "command",
+  thresholdMnt: 10,
+  activeView: "overview",
   online: false,
   incidents: []
 };
@@ -66,6 +67,7 @@ function applyRemoteState(remote) {
     transferDetected: remote.transferDetected,
     resolved: remote.resolved,
     outcome: remote.outcome,
+    thresholdMnt: remote.thresholdMnt,
     incidents: remote.incidents
   });
   Object.assign(agent, {
@@ -102,9 +104,6 @@ function isTxHash(value) {
 function cls(flag) {
   return flag ? "is-on" : "";
 }
-function gate(flag) {
-  return flag ? "" : "disabled";
-}
 function short(hash) {
   if (!hash || hash.length < 18) return hash;
   return `${hash.slice(0, 10)}...${hash.slice(-8)}`;
@@ -120,16 +119,6 @@ function proofValue(hash) {
 }
 
 // src/client/components.ts
-function chatLine(kind, text, meta = []) {
-  return `
-    <div class="chat-line ${kind}">
-      <div class="bubble">
-        <p>${text}</p>
-        ${meta.length ? `<ul>${meta.map((item) => `<li>${item}</li>`).join("")}</ul>` : ""}
-      </div>
-    </div>
-  `;
-}
 function alertCard() {
   return `
     <div class="alert-card">
@@ -143,22 +132,53 @@ function alertCard() {
         <span>Policy >10 MNT + new recipient</span>
         <span>Evidence ${short(agent.tx)}</span>
       </div>
-      <div class="alert-actions">
-        <button data-action="expected" ${gate(state.transferDetected)}>Expected Transfer</button>
-        <button data-action="suspicious" ${gate(state.transferDetected)}>Suspicious Activity</button>
-        <button data-view="passport">View Proof</button>
-      </div>
     </div>
   `;
-}
-function actionButton(action, label, enabled) {
-  return `<button class="action-button" data-action="${action}" ${enabled ? "" : "disabled"}>${label}</button>`;
 }
 function metric(label, value) {
   return `
     <div class="metric">
       <span>${label}</span>
       <strong>${value}</strong>
+    </div>
+  `;
+}
+function analyticsCard(title, value, detail, tone = "neutral") {
+  return `
+    <article class="analytics-card ${tone}">
+      <span>${title}</span>
+      <strong>${value}</strong>
+      <p>${detail}</p>
+    </article>
+  `;
+}
+function signalTable(incidents) {
+  if (!incidents.length) {
+    return `
+      <div class="empty-state">
+        <strong>No incidents recorded</strong>
+        <p>Telegram remains the primary workflow for wallet setup, policies, and outcome review.</p>
+      </div>
+    `;
+  }
+  return `
+    <div class="signal-table">
+      <div class="signal-row head">
+        <span>Severity</span>
+        <span>Outcome</span>
+        <span>Amount</span>
+        <span>Evidence</span>
+      </div>
+      ${incidents.map(
+    (incident) => `
+            <div class="signal-row">
+              <strong>${incident.severity}</strong>
+              <span>${incident.outcome}</span>
+              <span>${incident.outflowAmountMnt} MNT</span>
+              <code>${short(incident.evidenceTxHash)}</code>
+            </div>
+          `
+  ).join("")}
     </div>
   `;
 }
@@ -179,59 +199,68 @@ function proofCard(title, label, done, value, linked = true) {
     </article>
   `;
 }
-function proofMeta(label, txHash) {
-  return txHash ? `${label} ${txLink(txHash)}` : `${label} Pending`;
-}
 
 // src/client/views.ts
-function commandView() {
+function overviewView() {
+  const alerts = state.incidents.length;
+  const resolved = state.incidents.filter((incident) => incident.outcome !== "Unresolved").length;
+  const suspicious = state.incidents.filter((incident) => incident.outcome === "Suspicious Activity").length;
+  const latestIncident = state.incidents[0];
+  const monitorTone = state.monitorActive ? "good" : "warn";
+  const evidenceTone = agent.evidenceSource === "mantle-transaction" ? "good" : "warn";
   return `
-    <section class="workspace">
-      <div class="terminal-panel">
-        <div class="panel-head">
-          <div>
-            <span class="eyebrow">Telegram runtime</span>
-            <h2>MantSent command loop</h2>
-          </div>
-          <span class="pill ${cls(state.online)}">Backend ${state.online ? "online" : "offline"}</span>
-        </div>
-        <div class="chat-stack">
-          ${chatLine("user", "/create")}
-          ${state.agentCreated ? chatLine("bot", "Your Mantle Sentinel is live.", [`Agent profile #${agent.id}`, agent.skillName, agent.identityStatus === "erc8004-registered" ? "ERC-8004 registered" : "Demo identity pending ERC-8004 registration", "Passport ready"]) : ""}
-          ${state.agentCreated ? chatLine("user", `/watch ${agent.wallet || "0xTreasuryWallet"}`) : ""}
-          ${state.walletWatched ? chatLine("bot", "Watching this Mantle wallet.", ["Set a risk rule with /policy"]) : ""}
-          ${state.walletWatched ? chatLine("user", "/policy Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.") : ""}
-          ${state.policyActive ? chatLine("bot", "Policy active on Mantle.", ["Asset MNT", "Trigger outflow greater than 10 MNT", "Escalation new recipient = Critical", proofMeta("Proof", agent.policyTx)]) : ""}
-          ${state.transferDetected ? alertCard() : ""}
-          ${state.resolved ? chatLine("bot", "Outcome recorded on Mantle.", [`Label ${state.outcome}`, proofMeta("Proof", agent.outcomeTx)]) : ""}
-        </div>
+    <section class="analytics-overview">
+      <div class="overview-grid">
+        ${analyticsCard("Monitor", state.monitorActive ? "Live" : "Offline", state.monitorActive ? "Mantle polling is active for the watched wallet." : "Enable monitoring from Telegram to begin scanning confirmed MNT outflows.", monitorTone)}
+        ${analyticsCard("Evidence", agent.evidenceSource === "mantle-transaction" ? "Real tx" : "Demo", agent.evidenceSource === "mantle-transaction" ? "Latest alert is backed by a confirmed Mantle transaction." : "Latest signal is demo/simulated and should not be treated as live evidence.", evidenceTone)}
+        ${analyticsCard("Policy", state.policyActive ? `>${state.thresholdMnt} MNT` : "Not set", state.policyActive ? "Escalates first-seen recipients above the configured outflow threshold." : "Set the wallet policy in Telegram.", state.policyActive ? "good" : "warn")}
+        ${analyticsCard("Outcome", state.outcome, state.resolved ? "Latest alert has an operator-reviewed outcome." : "Awaiting operator review in Telegram.", state.resolved ? "good" : "neutral")}
       </div>
 
-      <aside class="operator-panel">
-        <div class="panel-head compact">
-          <span class="eyebrow">Golden path</span>
-          <span>${progress()}%</span>
+      <div class="analytics-layout">
+        <section class="insight-panel">
+          <div class="panel-head">
+            <div>
+              <span class="eyebrow">Signal intelligence</span>
+              <h2>Wallet risk posture</h2>
+            </div>
+            <span class="pill ${cls(state.online)}">Backend ${state.online ? "online" : "offline"}</span>
+          </div>
+          <div class="posture-body">
+            ${state.transferDetected ? alertCard() : noAlertState()}
+            <div class="signal-summary">
+              ${metric("Incidents", alerts)}
+              ${metric("Resolved", resolved)}
+              ${metric("Suspicious", suspicious)}
+              ${metric("Completion", progress())}
+            </div>
+          </div>
+        </section>
+
+        <aside class="telegram-panel">
+          <span class="eyebrow">Primary workflow</span>
+          <h2>Operate from Telegram</h2>
+          <p>Use Telegram to create or redeploy the agent, change wallets, set policy, enable monitoring, and resolve outcomes. This website is analytics-only.</p>
+          <div class="command-list">
+            <code>/start</code>
+            <code>/watch 0x...</code>
+            <code>/policy ...</code>
+            <code>/monitor</code>
+            <code>/proof</code>
+            <code>/reset</code>
+          </div>
+        </aside>
+      </div>
+
+      <section class="insight-panel">
+        <div class="panel-head">
+          <div>
+            <span class="eyebrow">Incident ledger</span>
+            <h2>Recent signals</h2>
+          </div>
         </div>
-        <div class="progress-track"><span style="width:${progress()}%"></span></div>
-        <div class="status-stack">
-          ${statusBadge("Identity", agent.identityStatus === "erc8004-registered" ? "ERC-8004" : "Demo profile", agent.identityStatus === "erc8004-registered" ? "good" : "warn")}
-          ${statusBadge("Skill", "One wallet", "good")}
-          ${statusBadge("Monitor", state.monitorActive ? "Live polling" : "Off", state.monitorActive ? "good" : "warn")}
-          ${statusBadge("Evidence", agent.evidenceSource === "mantle-transaction" ? "Real tx" : "Demo hash", agent.evidenceSource === "mantle-transaction" ? "good" : "warn")}
-        </div>
-        <div class="action-grid">
-          ${actionButton("create", "Create Agent", true)}
-          ${actionButton("watch", "Watch Wallet", state.agentCreated)}
-          ${actionButton("policy", "Commit Policy", state.walletWatched)}
-          ${actionButton("monitor", "Enable Monitor", state.policyActive)}
-          ${actionButton("transfer", "Trigger MNT Outflow", state.policyActive)}
-        </div>
-        <div class="resolve-row">
-          ${actionButton("expected", "Expected", state.transferDetected)}
-          ${actionButton("suspicious", "Suspicious", state.transferDetected)}
-        </div>
-        <button class="ghost-button" data-action="reset">Reset demo state</button>
-      </aside>
+        ${signalTable(state.incidents)}
+      </section>
     </section>
   `;
 }
@@ -313,6 +342,15 @@ function timelineItem(step) {
     </article>
   `;
 }
+function noAlertState() {
+  return `
+    <div class="no-alert-state">
+      <span class="eyebrow">No active alert</span>
+      <h3>Awaiting a policy-matching Mantle outflow.</h3>
+      <p>When Telegram enables monitoring for a wallet, matching outflows will appear here as analytics events with proof receipts.</p>
+    </div>
+  `;
+}
 
 // src/shared/branding.ts
 var defaultMantleLogoUrl = "/assets/mantsent-telegram-banner.png";
@@ -323,7 +361,7 @@ var app = document.querySelector("#app");
 if (!app) throw new Error("Missing #app mount node");
 var mount = app;
 function render() {
-  const view = state.activeView === "passport" ? passportView() : state.activeView === "evidence" ? evidenceView() : commandView();
+  const view = state.activeView === "passport" ? passportView() : state.activeView === "evidence" ? evidenceView() : overviewView();
   mount.innerHTML = `
     <div class="app-shell">
       <header class="topbar">
@@ -337,9 +375,9 @@ function render() {
           </div>
         </div>
         <nav class="view-tabs" aria-label="MantSent views">
-          <button class="${state.activeView === "command" ? "active" : ""}" data-view="command">Command</button>
-          <button class="${state.activeView === "passport" ? "active" : ""}" data-view="passport">Passport</button>
-          <button class="${state.activeView === "evidence" ? "active" : ""}" data-view="evidence">Evidence</button>
+          <button class="${state.activeView === "overview" ? "active" : ""}" data-view="overview">Overview</button>
+          <button class="${state.activeView === "passport" ? "active" : ""}" data-view="passport">Agent</button>
+          <button class="${state.activeView === "evidence" ? "active" : ""}" data-view="evidence">Proofs</button>
         </nav>
         <div class="network-chip">
           <span></span>
@@ -348,8 +386,8 @@ function render() {
       </header>
       <section class="hero-band">
         <div>
-          <span class="eyebrow">MNT anomaly intelligence</span>
-          <h1>Mantle treasury alerts with proof secured on Mantle.</h1>
+          <span class="eyebrow">Analytics command center</span>
+          <h1>Mantle wallet risk analytics with proof secured on Mantle.</h1>
         </div>
         <div class="hero-proof">
           <small>Verified flow</small>
@@ -365,18 +403,7 @@ function setView(view) {
   render();
 }
 
-// src/client/toast.ts
-function showError(message) {
-  const toast = document.createElement("div");
-  toast.className = "toast";
-  toast.textContent = message;
-  document.body.append(toast);
-  setTimeout(() => toast.remove(), 5200);
-}
-
 // src/client/api.ts
-var demoWallet = "0x7f2c2fbb1d2e4b6e6f8e45b902399d8a3c02a91e";
-var demoPolicy = "Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.";
 async function loadRemoteState() {
   try {
     const response = await fetch("api/state");
@@ -388,32 +415,12 @@ async function loadRemoteState() {
   }
   render();
 }
-async function callAction(action) {
-  const body = { action };
-  if (action === "watch") body.address = demoWallet;
-  if (action === "policy") body.text = demoPolicy;
-  const response = await fetch("api/action", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body)
-  });
-  const payload = await response.json();
-  if (!response.ok) throw new Error(payload.error || "Action failed");
-  applyRemoteState(payload);
-  state.online = true;
-  render();
-}
-function runAction(action) {
-  callAction(action).catch((error) => showError(error.message));
-}
 
 // src/client/main.ts
 document.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
-  const action = target.closest("[data-action]")?.dataset.action;
   const view = target.closest("[data-view]")?.dataset.view;
-  if (action) runAction(action);
   if (view) setView(view);
 });
 loadRemoteState();

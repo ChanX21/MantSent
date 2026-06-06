@@ -8,6 +8,7 @@ export interface ClientState {
   transferDetected: boolean;
   resolved: boolean;
   outcome: PublicState["outcome"];
+  thresholdMnt: number;
   activeView: ViewName;
   online: boolean;
   incidents: PublicState["incidents"];
@@ -28,7 +29,7 @@ export interface AgentViewModel {
   skillDescription: string;
 }
 
-export type ViewName = "command" | "passport" | "evidence";
+export type ViewName = "overview" | "passport" | "evidence";
 
 export interface StepViewModel {
   key: keyof Pick<ClientState, "agentCreated" | "walletWatched" | "policyActive" | "transferDetected" | "resolved">;
