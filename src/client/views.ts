@@ -10,7 +10,7 @@ export function analyticsDashboardView(): string {
   const latest = state.incidents[0];
 
   return `
-    <main class="analytics-dashboard">
+    <main id="dashboard" class="analytics-dashboard">
       <section class="kpi-grid" aria-label="MantSent analytics summary">
         ${analyticsCard("Monitoring", state.monitorActive ? "Live" : "Off", state.monitorActive ? "Polling Mantle for wallet outflows" : "Start monitoring from Telegram", state.monitorActive ? "good" : "warn")}
         ${analyticsCard("Watched wallet", agent.wallet ? short(agent.wallet) : "Not set", agent.wallet ? "Single-wallet scope is configured" : "Use /watch in Telegram", agent.wallet ? "good" : "warn")}
