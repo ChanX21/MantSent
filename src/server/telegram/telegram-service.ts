@@ -50,6 +50,7 @@ export function createTelegramService({
   mantleLogoUrl = defaultMantleLogoUrl,
   telegramImagePath = defaultTelegramImagePath,
   demoMode = false,
+  adminChatIds,
 }: {
   botToken?: string;
   actions: ActionService;
@@ -57,7 +58,9 @@ export function createTelegramService({
   mantleLogoUrl?: string;
   telegramImagePath?: string;
   demoMode?: boolean;
+  adminChatIds?: string;
 }): TelegramService {
+  const adminChats = parseAdminChatIds(adminChatIds);
   async function call<T>(method: string, body: Record<string, unknown>): Promise<T> {
     if (!botToken) throw new Error("TELEGRAM_BOT_TOKEN is not set.");
     const response = await fetch(`https://api.telegram.org/bot${botToken}/${method}`, {
@@ -83,12 +86,13 @@ export function createTelegramService({
 
   async function sendStatus(chatId: number): Promise<void> {
     const state = actions.state();
+    const keyboard = isAuthorizedChat(chatId, adminChats) ? { inline_keyboard: buttonsFor(state, chainId, demoMode) } : undefined;
     await call("sendMessage", {
       chat_id: chatId,
       text: statusText(state, chainId),
       parse_mode: "HTML",
       disable_web_page_preview: true,
-      reply_markup: { inline_keyboard: buttonsFor(state, chainId, demoMode) },
+      reply_markup: keyboard,
     });
   }
 
@@ -109,6 +113,10 @@ export function createTelegramService({
   async function handleCallback(callback: NonNullable<TelegramUpdate["callback_query"]>, chatId: number): Promise<void> {
     await call("answerCallbackQuery", { callback_query_id: callback.id });
     const action = callback.data;
+    if (!isReadOnlyCallback(action) && !isAuthorizedChat(chatId, adminChats)) {
+      await sendUnauthorized(chatId);
+      return;
+    }
     if (["watch_demo", "policy_demo", "transfer_demo"].includes(action) && !demoMode) {
       await call("sendMessage", {
         chat_id: chatId,
@@ -157,6 +165,8 @@ export function createTelegramService({
       if (command === "/start") {
         await sendMantleIntro(chatId);
         await sendStatus(chatId);
+      } else if (!isReadOnlyCommand(command) && !isAuthorizedChat(chatId, adminChats)) {
+        await sendUnauthorized(chatId);
       } else if (command === "/create") {
         await actions.run("create", { name: args || undefined });
         await sendStatus(chatId);
@@ -289,6 +299,36 @@ export function createTelegramService({
       });
     }
   }
+
+  async function sendUnauthorized(chatId: number): Promise<void> {
+    await call("sendMessage", {
+      chat_id: chatId,
+      text:
+        `<b>Unauthorized operator.</b>\nThis bot is restricted to configured admin Telegram chat IDs.\n\nYour chat ID: <code>${chatId}</code>\nAdd it to <code>TELEGRAM_ADMIN_CHAT_IDS</code> in the deployment environment.`,
+      parse_mode: "HTML",
+    });
+  }
+}
+
+function parseAdminChatIds(value?: string): Set<number> {
+  return new Set(
+    String(value || "")
+      .split(",")
+      .map((item) => Number(item.trim()))
+      .filter(Number.isFinite),
+  );
+}
+
+function isAuthorizedChat(chatId: number, adminChats: Set<number>): boolean {
+  return adminChats.size > 0 && adminChats.has(chatId);
+}
+
+function isReadOnlyCommand(command?: string): boolean {
+  return !command || ["/start", "/proof", "/incidents", "/help"].includes(command);
+}
+
+function isReadOnlyCallback(action: string): boolean {
+  return action === "proof";
 }
 
 function rememberChat(chatId: number): void {

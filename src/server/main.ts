@@ -16,6 +16,12 @@ if (!env.TELEGRAM_WEBHOOK_SECRET) {
   console.log("Generated TELEGRAM_WEBHOOK_SECRET and saved it to .env");
 }
 
+if (!env.MANTSENT_API_ADMIN_TOKEN) {
+  env.MANTSENT_API_ADMIN_TOKEN = randomBytes(32).toString("hex");
+  updateEnvValue("MANTSENT_API_ADMIN_TOKEN", env.MANTSENT_API_ADMIN_TOKEN);
+  console.log("Generated MANTSENT_API_ADMIN_TOKEN and saved it to .env");
+}
+
 const actions = createActionService(env);
 const telegram = createTelegramService({
   botToken: env.TELEGRAM_BOT_TOKEN,
@@ -24,6 +30,7 @@ const telegram = createTelegramService({
   mantleLogoUrl: env.MANTLE_LOGO_URL,
   telegramImagePath: env.MANTLE_TELEGRAM_IMAGE_PATH || defaultTelegramImagePath,
   demoMode: String(env.MANTSENT_ENABLE_DEMO_MODE || "").toLowerCase() === "true",
+  adminChatIds: env.TELEGRAM_ADMIN_CHAT_IDS,
 });
 const handler = createRequestHandler({ env, actions, telegram });
 

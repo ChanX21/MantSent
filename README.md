@@ -22,6 +22,14 @@ npm run env:check
 
 Secrets are intentionally excluded from git. `DEPLOYER_PRIVATE_KEY` must stay local or in the deployment provider secret store.
 
+HTTP mutations are locked behind `MANTSENT_API_ADMIN_TOKEN`. If the value is missing, the app generates one on boot and saves it to `.env`. Static serving is allowlisted to the browser bundle and `assets/`; `.env`, `data/`, source files, and deployment artifacts are not served.
+
+Telegram mutations are restricted to `TELEGRAM_ADMIN_CHAT_IDS`. To find your chat ID, send `/start` to the bot before setting the value; the unauthorized response includes the chat ID to add:
+
+```env
+TELEGRAM_ADMIN_CHAT_IDS=123456789
+```
+
 Agent defaults can be customized per deployment:
 
 ```env

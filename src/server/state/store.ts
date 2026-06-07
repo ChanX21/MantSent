@@ -60,7 +60,9 @@ export function loadState(path = statePath): AppState {
 function sanitizeLegacyDemoState(state: AppState): void {
   if (String(process.env.MANTSENT_ENABLE_DEMO_MODE || "").toLowerCase() === "true") return;
   const hasLegacyDemoWallet = state.watchedWallet.toLowerCase() === legacyDemoWallet.toLowerCase();
-  const hasDemoOnlySignal = state.evidenceSource === "demo" || state.incidents.some((incident) => incident.source === "demo");
+  const hasDemoTransfer = state.transferDetected && state.evidenceSource === "demo";
+  const hasDemoIncident = state.incidents.some((incident) => incident.source === "demo");
+  const hasDemoOnlySignal = hasDemoTransfer || hasDemoIncident;
   if (!hasLegacyDemoWallet && !hasDemoOnlySignal) return;
 
   Object.assign(state, {

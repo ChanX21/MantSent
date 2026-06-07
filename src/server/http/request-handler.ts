@@ -1,6 +1,6 @@
 import { createReadStream, existsSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { extname, join, normalize } from "node:path";
+import { extname, join, normalize, relative } from "node:path";
 import type { ActionPayload, RuntimeEnv } from "../../shared/types.js";
 import type { ActionService } from "../actions/action-service.js";
 import type { TelegramService } from "../telegram/telegram-service.js";
@@ -18,6 +18,8 @@ const mime: Record<string, string> = {
   ".webp": "image/webp",
 };
 
+const staticAllowlist = new Set(["index.html", "app.js", "app.js.map", "styles.css"]);
+
 export function createRequestHandler({ env, actions, telegram }: { env: RuntimeEnv; actions: ActionService; telegram: TelegramService }) {
   return async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const url = new URL(req.url || "/", `http://${req.headers.host}`);
@@ -26,6 +28,7 @@ export function createRequestHandler({ env, actions, telegram }: { env: RuntimeE
       if (url.pathname === "/api/state") return json(res, 200, actions.state());
       if (url.pathname === "/agent-metadata.json") return json(res, 200, agentMetadata(actions));
       if (url.pathname === "/api/action" && req.method === "POST") {
+        if (!isAuthorized(req, env)) return json(res, 401, { error: "Unauthorized" });
         const body = (await readJson(req)) as ActionPayload;
         if (!body.action) return json(res, 400, { error: "Missing action" });
         const next = await actions.run(body.action, body);
@@ -73,10 +76,18 @@ async function readJson(req: IncomingMessage): Promise<unknown> {
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
+function isAuthorized(req: IncomingMessage, env: RuntimeEnv): boolean {
+  if (!env.MANTSENT_API_ADMIN_TOKEN) return false;
+  return req.headers.authorization === `Bearer ${env.MANTSENT_API_ADMIN_TOKEN}`;
+}
+
 function serveStatic(url: URL, res: ServerResponse): void {
   const requested = url.pathname === "/" ? "index.html" : url.pathname.slice(1);
   const filePath = normalize(join(process.cwd(), requested));
-  if (!filePath.startsWith(process.cwd()) || !existsSync(filePath)) {
+  const safeRelative = relative(process.cwd(), filePath);
+  const isAsset = safeRelative.startsWith("assets/") && !safeRelative.includes("..");
+  const isAllowedRootFile = staticAllowlist.has(safeRelative);
+  if (!filePath.startsWith(process.cwd()) || !existsSync(filePath) || (!isAllowedRootFile && !isAsset)) {
     res.writeHead(404);
     res.end("Not found");
     return;

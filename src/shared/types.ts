@@ -88,6 +88,8 @@ export interface RuntimeEnv {
   MANTSENT_SIGNAL_LEDGER?: string;
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_WEBHOOK_SECRET?: string;
+  TELEGRAM_ADMIN_CHAT_IDS?: string;
+  MANTSENT_API_ADMIN_TOKEN?: string;
   PASSPORT_BASE_URL?: string;
   MANTLE_LOGO_URL?: string;
   MANTLE_TELEGRAM_IMAGE_PATH?: string;
