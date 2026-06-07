@@ -13,7 +13,6 @@ export const state: ClientState = {
   openAiConfigured: false,
   agentRegistrationTxHash: "",
   agentUri: "agent-metadata.json",
-  activeView: "overview",
   online: false,
   incidents: [],
 };

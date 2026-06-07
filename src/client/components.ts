@@ -42,6 +42,48 @@ export function analyticsCard(title: string, value: string, detail: string, tone
   `;
 }
 
+export function sparkBars(incidents: PublicState["incidents"]): string {
+  const buckets = bucketIncidents(incidents);
+  const max = Math.max(1, ...buckets);
+
+  return `
+    <div class="spark-panel" aria-label="Signal activity chart">
+      ${buckets
+        .map((count, index) => {
+          const height = Math.max(12, Math.round((count / max) * 100));
+          return `<span style="--bar-height:${height}%" title="Bucket ${index + 1}: ${count} signal${count === 1 ? "" : "s"}"></span>`;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+export function setupChecklist(): string {
+  const rows = [
+    ["Agent profile", state.agentCreated],
+    ["ERC-8004 identity", agent.identityStatus === "erc8004-registered"],
+    ["Wallet scope", state.walletWatched],
+    ["Policy", state.policyActive],
+    ["Live monitor", state.monitorActive],
+  ] as const;
+
+  return `
+    <div class="setup-list">
+      ${rows
+        .map(
+          ([label, done]) => `
+            <div class="setup-row ${done ? "done" : ""}">
+              <span></span>
+              <strong>${label}</strong>
+              <small>${done ? "Ready" : "Pending"}</small>
+            </div>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
 export function signalTable(incidents: PublicState["incidents"]): string {
   if (!incidents.length) {
     return `
@@ -74,6 +116,19 @@ export function signalTable(incidents: PublicState["incidents"]): string {
         .join("")}
     </div>
   `;
+}
+
+function bucketIncidents(incidents: PublicState["incidents"]): number[] {
+  const bucketCount = 18;
+  const buckets = Array.from({ length: bucketCount }, () => 0);
+  if (!incidents.length) return buckets;
+
+  incidents.slice(0, bucketCount).forEach((incident, index) => {
+    const bucketIndex = bucketCount - 1 - index;
+    buckets[bucketIndex] = (buckets[bucketIndex] ?? 0) + (incident.outcome === "Suspicious Activity" ? 2 : 1);
+  });
+
+  return buckets;
 }
 
 export function statusBadge(label: string, value: string, tone: "good" | "warn" | "neutral" = "neutral"): string {

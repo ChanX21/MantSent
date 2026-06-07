@@ -13,7 +13,6 @@ export interface ClientState {
   openAiConfigured: boolean;
   agentRegistrationTxHash: string;
   agentUri: string;
-  activeView: ViewName;
   online: boolean;
   incidents: PublicState["incidents"];
 }
@@ -33,8 +32,6 @@ export interface AgentViewModel {
   skillName: string;
   skillDescription: string;
 }
-
-export type ViewName = "overview" | "passport" | "evidence";
 
 export interface StepViewModel {
   key: keyof Pick<ClientState, "agentCreated" | "walletWatched" | "policyActive" | "transferDetected" | "resolved">;

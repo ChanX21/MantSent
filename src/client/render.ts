@@ -1,6 +1,5 @@
-import { evidenceView, overviewView, passportView } from "./views.js";
+import { analyticsDashboardView } from "./views.js";
 import { progress, state } from "./state.js";
-import type { ViewName } from "./types.js";
 import { defaultMantleLogoUrl, mantleProofTagline } from "../shared/branding.js";
 
 const app = document.querySelector("#app");
@@ -8,8 +7,6 @@ if (!app) throw new Error("Missing #app mount node");
 const mount = app;
 
 export function render(): void {
-  const view = state.activeView === "passport" ? passportView() : state.activeView === "evidence" ? evidenceView() : overviewView();
-
   mount.innerHTML = `
     <div class="app-shell">
       <header class="topbar">
@@ -22,11 +19,6 @@ export function render(): void {
             <small>${mantleProofTagline}</small>
           </div>
         </div>
-        <nav class="view-tabs" aria-label="MantSent views">
-          <button class="${state.activeView === "overview" ? "active" : ""}" data-view="overview">Overview</button>
-          <button class="${state.activeView === "passport" ? "active" : ""}" data-view="passport">Agent</button>
-          <button class="${state.activeView === "evidence" ? "active" : ""}" data-view="evidence">Proofs</button>
-        </nav>
         <div class="network-chip">
           <span></span>
           ${state.online ? "Secured on Mantle" : "Mantle Preview"}
@@ -42,12 +34,7 @@ export function render(): void {
           <strong>${progress()}%</strong>
         </div>
       </section>
-      ${view}
+      ${analyticsDashboardView()}
     </div>
   `;
-}
-
-export function setView(view: ViewName): void {
-  state.activeView = view;
-  render();
 }
