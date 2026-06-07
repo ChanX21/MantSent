@@ -1,5 +1,5 @@
 import { analyticsDashboardView } from "./views.js";
-import { progress, state } from "./state.js";
+import { setupProgress, state } from "./state.js";
 import { defaultMantleLogoUrl, mantleProofTagline } from "../shared/branding.js";
 
 const app = document.querySelector("#app");
@@ -37,13 +37,13 @@ export function render(): void {
           <p>${mantleProofTagline}. Operate from Telegram, analyze the live wallet posture here.</p>
           <div class="hero-actions" aria-label="MantSent quick status">
             <a href="#dashboard">View Analytics</a>
-            <span>Agent ${progress()}% ready</span>
+            <span>Agent ${setupProgress()}% ready</span>
             <span>${state.monitorActive ? "Live monitor" : "Monitor pending"}</span>
           </div>
         </div>
         <div class="hero-proof">
           <small>Verified flow</small>
-          <strong>${progress()}%</strong>
+          <strong>${setupProgress()}%</strong>
         </div>
       </section>
       ${analyticsDashboardView()}

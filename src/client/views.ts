@@ -1,6 +1,6 @@
 import { alertCard, analyticsCard, metric, setupChecklist, signalTable, sparkBars, statusBadge } from "./components.js";
 import { cls, short } from "./format.js";
-import { agent, progress, state } from "./state.js";
+import { agent, setupProgress, state } from "./state.js";
 
 export function analyticsDashboardView(): string {
   const alerts = state.incidents.length;
@@ -30,7 +30,7 @@ export function analyticsDashboardView(): string {
           <div class="risk-canvas">
             <div class="risk-score">
               <span>Setup completion</span>
-              <strong>${progress()}%</strong>
+              <strong>${setupProgress()}%</strong>
               <small>${nextStep()}</small>
             </div>
             ${sparkBars(state.incidents)}

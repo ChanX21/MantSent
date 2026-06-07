@@ -30,38 +30,6 @@ var agent = {
   skillName: "Single Wallet MNT Outflow Monitor",
   skillDescription: "Monitors one Mantle address for native MNT outflows against a threshold and recipient novelty policy."
 };
-var steps = [
-  {
-    key: "agentCreated",
-    title: "ERC-8004 agent",
-    proof: "IdentityRegistry",
-    detail: () => agent.identityStatus === "erc8004-registered" ? "MantSent Treasury Anomaly Monitor is registered through ERC-8004 on Mantle." : "Local agent profile is active. ERC-8004 registration is the next identity step."
-  },
-  {
-    key: "walletWatched",
-    title: "Mantle wallet",
-    proof: "Watch active",
-    detail: () => `${agent.wallet || "Watched wallet"} is pinned to the agent policy scope.`
-  },
-  {
-    key: "policyActive",
-    title: "Policy committed",
-    proof: "PolicyCommitted",
-    detail: () => "Alert for MNT outflows greater than 10 to first-seen recipients."
-  },
-  {
-    key: "transferDetected",
-    title: "Critical alert",
-    proof: "AlertCommitted",
-    detail: () => agent.evidenceSource === "mantle-transaction" ? "A real Mantle transaction matched the active policy." : "A demo alert proof was committed without a real transfer watcher event."
-  },
-  {
-    key: "resolved",
-    title: "Human outcome",
-    proof: "OutcomeRecorded",
-    detail: () => "Operator label is attached to the alert hash."
-  }
-];
 function applyRemoteState(remote) {
   Object.assign(state, {
     agentCreated: remote.agentCreated,
@@ -93,9 +61,16 @@ function applyRemoteState(remote) {
     identityStatus: remote.agentIdentityStatus
   });
 }
-function progress() {
-  const complete = steps.filter((step) => state[step.key]).length;
-  return Math.round(complete / steps.length * 100);
+function setupProgress() {
+  const setupItems = [
+    state.agentCreated,
+    agent.identityStatus === "erc8004-registered",
+    state.walletWatched,
+    state.policyActive,
+    state.monitorActive
+  ];
+  const complete = setupItems.filter(Boolean).length;
+  return Math.round(complete / setupItems.length * 100);
 }
 
 // src/client/format.ts
@@ -256,7 +231,7 @@ function analyticsDashboardView() {
           <div class="risk-canvas">
             <div class="risk-score">
               <span>Setup completion</span>
-              <strong>${progress()}%</strong>
+              <strong>${setupProgress()}%</strong>
               <small>${nextStep()}</small>
             </div>
             ${sparkBars(state.incidents)}
@@ -395,13 +370,13 @@ function render() {
           <p>${mantleProofTagline}. Operate from Telegram, analyze the live wallet posture here.</p>
           <div class="hero-actions" aria-label="MantSent quick status">
             <a href="#dashboard">View Analytics</a>
-            <span>Agent ${progress()}% ready</span>
+            <span>Agent ${setupProgress()}% ready</span>
             <span>${state.monitorActive ? "Live monitor" : "Monitor pending"}</span>
           </div>
         </div>
         <div class="hero-proof">
           <small>Verified flow</small>
-          <strong>${progress()}%</strong>
+          <strong>${setupProgress()}%</strong>
         </div>
       </section>
       ${analyticsDashboardView()}

@@ -108,3 +108,15 @@ export function progress(): number {
   const complete = steps.filter((step) => state[step.key]).length;
   return Math.round((complete / steps.length) * 100);
 }
+
+export function setupProgress(): number {
+  const setupItems = [
+    state.agentCreated,
+    agent.identityStatus === "erc8004-registered",
+    state.walletWatched,
+    state.policyActive,
+    state.monitorActive,
+  ];
+  const complete = setupItems.filter(Boolean).length;
+  return Math.round((complete / setupItems.length) * 100);
+}
