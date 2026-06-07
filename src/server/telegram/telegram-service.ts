@@ -35,6 +35,7 @@ interface TelegramResponse<T> {
 
 type InlineButton = { text: string; callback_data: string } | { text: string; url: string };
 type InlineKeyboard = InlineButton[][];
+type TelegramCommand = { command: string; description: string };
 
 export interface TelegramService {
   call: <T>(method: string, body: Record<string, unknown>) => Promise<T>;
@@ -93,6 +94,12 @@ export function createTelegramService({
       parse_mode: "HTML",
       disable_web_page_preview: true,
       reply_markup: keyboard,
+    });
+  }
+
+  async function configureBotCommands(): Promise<void> {
+    await call("setMyCommands", {
+      commands: commandsFor(demoMode),
     });
   }
 
@@ -167,6 +174,16 @@ export function createTelegramService({
         await sendStatus(chatId);
       } else if (!isReadOnlyCommand(command) && !isAuthorizedChat(chatId, adminChats)) {
         await sendUnauthorized(chatId);
+      } else if (isWalletAddress(text)) {
+        await actions.run("watch", { address: text.trim() });
+        await call("sendMessage", {
+          chat_id: chatId,
+          text: "<b>Wallet connected.</b>\nNow set the policy that should trigger alerts.",
+          parse_mode: "HTML",
+        });
+        await sendStatus(chatId);
+      } else if (looksLikePolicy(text) && actions.state().walletWatched) {
+        await securePolicy(chatId, text.trim());
       } else if (command === "/create") {
         await actions.run("create", { name: args || undefined });
         await sendStatus(chatId);
@@ -193,24 +210,26 @@ export function createTelegramService({
         await sendStatus(chatId);
       } else if (command === "/watch") {
         if (!args) {
-          await call("sendMessage", { chat_id: chatId, text: setupText, parse_mode: "HTML" });
+          await promptForWallet(chatId);
           return;
         }
         await actions.run("watch", { address: args });
+        await call("sendMessage", {
+          chat_id: chatId,
+          text: "<b>Wallet connected.</b>\nNext, send a monitoring policy.",
+          parse_mode: "HTML",
+        });
         await sendStatus(chatId);
       } else if (command === "/policy") {
         if (!args) {
-          await call("sendMessage", {
-            chat_id: chatId,
-            text:
-              "<b>Policy required</b>\nSend a policy such as:\n<code>/policy Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.</code>",
-            parse_mode: "HTML",
-          });
+          await promptForPolicy(chatId);
           return;
         }
-        await call("sendMessage", { chat_id: chatId, text: "<b>Securing policy proof on Mantle.</b>\nThis can take a moment.", parse_mode: "HTML" });
-        await actions.run("policy", { text: args });
-        await sendStatus(chatId);
+        if (!actions.state().walletWatched) {
+          await promptForWallet(chatId);
+          return;
+        }
+        await securePolicy(chatId, args);
       } else if (command === "/simulate" || command === "/demo") {
         if (!demoMode) {
           await call("sendMessage", {
@@ -224,6 +243,15 @@ export function createTelegramService({
         await actions.run("transfer", {});
         await sendStatus(chatId);
       } else if (command === "/monitor") {
+        const state = actions.state();
+        if (!state.walletWatched) {
+          await promptForWallet(chatId);
+          return;
+        }
+        if (!state.policyActive) {
+          await promptForPolicy(chatId);
+          return;
+        }
         await actions.run("monitor", {});
         await call("sendMessage", {
           chat_id: chatId,
@@ -233,7 +261,7 @@ export function createTelegramService({
         await sendStatus(chatId);
       } else if (command === "/reset") {
         await actions.run("reset");
-        await call("sendMessage", { chat_id: chatId, text: "<b>MantSent session reset.</b>\nUse /create to start again.", parse_mode: "HTML" });
+        await call("sendMessage", { chat_id: chatId, text: "<b>MantSent session reset.</b>\nUse <code>/deploy My Agent Name</code> to start again.", parse_mode: "HTML" });
         await sendStatus(chatId);
       } else if (command === "/redeploy") {
         await actions.run("reset");
@@ -256,6 +284,7 @@ export function createTelegramService({
 
   async function poll(): Promise<void> {
     if (!botToken) return;
+    await configureBotCommands().catch((error) => console.error(`Telegram command setup error: ${(error as Error).message}`));
     let offset = 0;
     while (true) {
       try {
@@ -308,6 +337,32 @@ export function createTelegramService({
       parse_mode: "HTML",
     });
   }
+
+  async function promptForWallet(chatId: number): Promise<void> {
+    await call("sendMessage", {
+      chat_id: chatId,
+      text: "<b>Wallet required</b>\nSend the Mantle wallet address to monitor.\n\nExample:\n<code>/watch 0x742d35Cc6634C0532925a3b844Bc454e4438f44e</code>",
+      parse_mode: "HTML",
+      reply_markup: { force_reply: true, input_field_placeholder: "0xYourMantleWallet" },
+    });
+  }
+
+  async function promptForPolicy(chatId: number): Promise<void> {
+    await call("sendMessage", {
+      chat_id: chatId,
+      text:
+        "<b>Policy required</b>\nDescribe when MantSent should alert.\n\nExample:\n<code>/policy Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.</code>",
+      parse_mode: "HTML",
+      reply_markup: { force_reply: true, input_field_placeholder: "Alert me if more than 10 MNT leaves..." },
+    });
+  }
+
+  async function securePolicy(chatId: number, policy: string): Promise<void> {
+    await call("sendMessage", { chat_id: chatId, text: "<b>Securing policy proof on Mantle.</b>\nThis can take a moment.", parse_mode: "HTML" });
+    await actions.run("policy", { text: policy });
+    await call("sendMessage", { chat_id: chatId, text: "<b>Policy active.</b>\nEnable live monitoring when ready.", parse_mode: "HTML" });
+    await sendStatus(chatId);
+  }
 }
 
 function parseAdminChatIds(value?: string): Set<number> {
@@ -331,6 +386,29 @@ function isReadOnlyCallback(action: string): boolean {
   return action === "proof";
 }
 
+function commandsFor(demoMode: boolean): TelegramCommand[] {
+  const commands: TelegramCommand[] = [
+    { command: "start", description: "Open MantSent and show current setup" },
+    { command: "deploy", description: "Create and register an ERC-8004 agent" },
+    { command: "watch", description: "Set the Mantle wallet to monitor" },
+    { command: "policy", description: "Commit an alert policy on Mantle" },
+    { command: "monitor", description: "Enable live Mantle wallet monitoring" },
+    { command: "openai", description: "Add an OpenAI key for richer explanations" },
+    { command: "proof", description: "Show agent, policy, alert, and outcome proofs" },
+    { command: "reset", description: "Reset this deployment state" },
+  ];
+  if (demoMode) commands.push({ command: "demo", description: "Run demo alert flow" });
+  return commands;
+}
+
+function isWalletAddress(value: string): boolean {
+  return /^0x[a-fA-F0-9]{40}$/.test(value.trim());
+}
+
+function looksLikePolicy(value: string): boolean {
+  return /\b(alert|notify|flag|monitor|if|when|transaction|transfer|mnt|outflow)\b/i.test(value) && value.trim().length > 12;
+}
+
 function rememberChat(chatId: number): void {
   mutateState((state) => {
     if (!state.chatIds.includes(chatId)) state.chatIds.push(chatId);
@@ -343,29 +421,28 @@ function statusText(state: PublicState, chainId?: string): string {
   return `<b>MantSent on Mantle</b>
 ${escapeHtml(mantleProofTagline)}
 
-<b>Agent</b>
-ID: <code>#${escapeHtml(state.agentId)}</code>
-Skill: ${escapeHtml(state.agentProfile.skill.name)}
-Identity: ${state.agentIdentityStatus === "erc8004-registered" ? "ERC-8004 registered" : "Local agent profile"}
-AI: ${state.aiProvider === "openai" && state.openAiConfigured ? "OpenAI enhanced" : escapeHtml(state.aiProvider)}
-Scope: One Mantle wallet
+<b>Next step</b>
+${nextStep(state)}
 
 <b>Setup</b>
 ${setupProgress(state)}
 
+<b>Agent</b>
+<code>#${escapeHtml(state.agentId)}</code> · ${state.agentIdentityStatus === "erc8004-registered" ? "ERC-8004" : "Local profile"} · ${state.aiProvider === "openai" && state.openAiConfigured ? "OpenAI" : escapeHtml(state.aiProvider)}
+
 <b>Monitoring</b>
-Wallet: ${state.watchedWallet ? `<code>${escapeHtml(state.watchedWallet)}</code>` : "Not set"}
-Policy: ${state.policyActive ? `&gt;${state.thresholdMnt} MNT to a new recipient` : "Not set"}
-Status: ${state.monitorActive ? "Live Mantle polling enabled" : "Not enabled"}
+Wallet: ${state.watchedWallet ? `<code>${escapeHtml(shortAddress(state.watchedWallet))}</code>` : "Not set"}
+Policy: ${state.policyActive ? `&gt;${state.thresholdMnt} MNT, new recipient escalation` : "Not set"}
+Monitor: ${state.monitorActive ? "Live" : "Off"}${latest ? `
 
-<b>Signal</b>
-Evidence: ${state.transferDetected ? (state.evidenceSource === "mantle-transaction" ? "Confirmed Mantle transaction" : "Demo/simulated event") : "No signal detected"}
-Outcome: ${escapeHtml(state.outcome)}${latest ? `
+<b>Latest signal</b>
+${escapeHtml(latest.severity)} · ${escapeHtml(latest.outflowAmountMnt)} MNT · ${escapeHtml(latest.outcome)}
+Evidence: ${state.evidenceSource === "mantle-transaction" ? "Confirmed Mantle transaction" : "Non-live/demo evidence"}
 
-<b>Agent explanation</b> (${escapeHtml(latest.explanationProvider)})
-${escapeHtml(latest.explanation)}` : ""}${proofs ? `
-
-<b>Proof receipts</b>
+<b>Agent explanation</b>
+${escapeHtml(latest.explanation)}` : ""}
+${proofs ? `
+<b>Proofs</b>
 ${proofs}` : ""}`;
 }
 
@@ -381,7 +458,7 @@ function proofLines(state: PublicState, chainId?: string): string {
 }
 
 function proofLink(label: string, txHash: string, chainId?: string): string {
-  return `<a href="${mantleTxUrl(txHash, chainId)}">${label}</a>`;
+  return `<a href="${mantleTxUrl(txHash, chainId)}">${label} proof</a>`;
 }
 
 function escapeHtml(value: string): string {
@@ -448,13 +525,28 @@ function buttonsFor(state: PublicState, chainId?: string, demoMode = false): Inl
 
 function setupProgress(state: PublicState): string {
   return [
-    `${state.agentCreated ? "Ready" : "Pending"} Agent profile`,
-    `${state.agentIdentityStatus === "erc8004-registered" ? "Ready" : "Pending"} ERC-8004 registration`,
-    `${state.openAiConfigured ? "Ready" : "Optional"} AI explanations`,
-    `${state.walletWatched ? "Ready" : "Pending"} Wallet`,
-    `${state.policyActive ? "Ready" : "Pending"} Policy`,
-    `${state.monitorActive ? "Live" : "Pending"} Monitor`,
+    `${state.agentCreated ? "✅" : "⬜"} Agent`,
+    `${state.agentIdentityStatus === "erc8004-registered" ? "✅" : "⬜"} ERC-8004`,
+    `${state.openAiConfigured ? "✅" : "◇"} AI`,
+    `${state.walletWatched ? "✅" : "⬜"} Wallet`,
+    `${state.policyActive ? "✅" : "⬜"} Policy`,
+    `${state.monitorActive ? "✅" : "⬜"} Monitor`,
   ].join("\n");
+}
+
+function nextStep(state: PublicState): string {
+  if (!state.agentCreated) return "Deploy the agent:\n<code>/deploy My Agent Name</code>";
+  if (state.agentIdentityStatus !== "erc8004-registered") return "Register the agent on Mantle:\n<code>/register</code>";
+  if (!state.walletWatched) return "Add the wallet to monitor:\n<code>/watch 0xYourMantleWallet</code>";
+  if (!state.policyActive) return "Set the alert policy:\n<code>/policy Alert me if more than 10 MNT leaves this wallet</code>";
+  if (!state.monitorActive) return "Start live monitoring:\n<code>/monitor</code>";
+  if (state.transferDetected && state.outcome === "Unresolved") return "Review the latest signal and choose an outcome.";
+  return "Live monitoring is active. I will alert here when the policy matches a Mantle transaction.";
+}
+
+function shortAddress(address: string): string {
+  if (address.length < 18) return address;
+  return `${address.slice(0, 8)}...${address.slice(-6)}`;
 }
 
 function managementButtons(): InlineButton[] {
