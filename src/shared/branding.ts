@@ -1,4 +1,4 @@
-export const defaultMantleLogoUrl = "/assets/mantsent-telegram-banner.png";
+export const defaultMantleLogoUrl = "/assets/mantle-logo.svg";
 
 export const defaultTelegramImagePath = "assets/mantsent-telegram-banner.png";
 
