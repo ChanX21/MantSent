@@ -49,8 +49,8 @@ function createAgent(env: RuntimeEnv, payload: ActionPayload = {}): AppState {
       updateEnvValue("MANTSENT_AGENT_NAME", requestedName);
     }
     state.agentProfile = createAgentProfile(env, state.agentId);
-    state.aiProvider = env.AI_PROVIDER || (env.OPENAI_API_KEY ? "openai" : "template");
-    state.openAiConfigured = Boolean(env.OPENAI_API_KEY);
+    state.aiProvider = configuredProvider(env);
+    state.openAiConfigured = isHostedAiConfigured(env, state.aiProvider);
   });
 }
 
@@ -77,22 +77,31 @@ async function deployAgent(env: RuntimeEnv, payload: ActionPayload): Promise<Pub
 function configureAi(env: RuntimeEnv, payload: ActionPayload): AppState {
   const provider = payload.provider || (payload.apiKey ? "openai" : "template");
   if (provider === "openai" && !payload.apiKey && !env.OPENAI_API_KEY) throw new Error("Provide an OpenAI API key with /openai sk-...");
+  if (provider === "groq" && !payload.apiKey && !env.GROQ_API_KEY) throw new Error("Provide a Groq API key with /groq gsk-...");
 
   env.AI_PROVIDER = provider;
   updateEnvValue("AI_PROVIDER", provider);
 
-  if (payload.apiKey) {
+  if (payload.apiKey && provider === "openai") {
     env.OPENAI_API_KEY = payload.apiKey;
     updateEnvValue("OPENAI_API_KEY", payload.apiKey);
   }
-  if (payload.model) {
+  if (payload.model && provider === "openai") {
     env.OPENAI_MODEL = payload.model;
     updateEnvValue("OPENAI_MODEL", payload.model);
+  }
+  if (payload.apiKey && provider === "groq") {
+    env.GROQ_API_KEY = payload.apiKey;
+    updateEnvValue("GROQ_API_KEY", payload.apiKey);
+  }
+  if (payload.model && provider === "groq") {
+    env.GROQ_MODEL = payload.model;
+    updateEnvValue("GROQ_MODEL", payload.model);
   }
 
   return mutateState((state) => {
     state.aiProvider = provider;
-    state.openAiConfigured = Boolean(env.OPENAI_API_KEY);
+    state.openAiConfigured = isHostedAiConfigured(env, provider);
   });
 }
 
@@ -246,8 +255,8 @@ function resetDemo(env: RuntimeEnv): AppState {
       agentId,
       agentUri: env.MANTSENT_AGENT_URI || state.agentUri || defaultAgentUri(env),
       agentRegistrationTxHash: "",
-      aiProvider: env.AI_PROVIDER || (env.OPENAI_API_KEY ? "openai" : "template"),
-      openAiConfigured: Boolean(env.OPENAI_API_KEY),
+      aiProvider: configuredProvider(env),
+      openAiConfigured: isHostedAiConfigured(env, configuredProvider(env)),
       agentProfile: createAgentProfile(env, agentId),
     });
   });
@@ -267,4 +276,19 @@ function defaultAgentUri(env: RuntimeEnv): string {
 
 function demoModeEnabled(env: RuntimeEnv): boolean {
   return String(env.MANTSENT_ENABLE_DEMO_MODE || "").toLowerCase() === "true";
+}
+
+function configuredProvider(env: RuntimeEnv): AppState["aiProvider"] {
+  if (env.AI_PROVIDER === "openai" || env.AI_PROVIDER === "groq" || env.AI_PROVIDER === "ollama" || env.AI_PROVIDER === "template") return env.AI_PROVIDER;
+  if (env.OPENAI_API_KEY) return "openai";
+  if (env.GROQ_API_KEY) return "groq";
+  if (env.OLLAMA_BASE_URL) return "ollama";
+  return "template";
+}
+
+function isHostedAiConfigured(env: RuntimeEnv, provider: AppState["aiProvider"]): boolean {
+  if (provider === "openai") return Boolean(env.OPENAI_API_KEY);
+  if (provider === "groq") return Boolean(env.GROQ_API_KEY);
+  if (provider === "ollama") return Boolean(env.OLLAMA_BASE_URL);
+  return false;
 }

@@ -23,8 +23,9 @@ export function templateExplanation(input: AlertExplanationInput): string {
 
 export function configuredAiProvider(env: RuntimeEnv): AiProvider {
   const requested = env.AI_PROVIDER;
-  if (requested === "openai" || requested === "ollama" || requested === "template") return requested;
+  if (requested === "openai" || requested === "groq" || requested === "ollama" || requested === "template") return requested;
   if (env.OPENAI_API_KEY) return "openai";
+  if (env.GROQ_API_KEY) return "groq";
   if (env.OLLAMA_BASE_URL) return "ollama";
   return "template";
 }

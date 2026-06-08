@@ -85,6 +85,7 @@ The agent can explain alerts through a small provider interface:
 | --- | --- | --- |
 | Template | `AI_PROVIDER=template` | Default, no API key, deterministic text. |
 | OpenAI | `AI_PROVIDER=openai` + `OPENAI_API_KEY` | Better alert explanations and future richer policy parsing. |
+| Groq | `AI_PROVIDER=groq` + `GROQ_API_KEY` | Fast hosted open-model alert explanations through Groq's OpenAI-compatible API. |
 | Ollama | `AI_PROVIDER=ollama` + local Ollama server | Local/free model mode for users who do not want hosted API calls. |
 
 The provider lives under `src/server/agent/llm/`. It must not decide whether an alert is true. It only explains the result of deterministic policy evaluation.

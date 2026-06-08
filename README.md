@@ -55,6 +55,12 @@ OPENAI_MODEL=gpt-4.1-mini
 ```
 
 ```env
+AI_PROVIDER=groq
+GROQ_API_KEY=...
+GROQ_MODEL=llama-3.1-8b-instant
+```
+
+```env
 AI_PROVIDER=ollama
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=qwen3:4b
@@ -83,6 +89,7 @@ Then message the bot configured by `TELEGRAM_BOT_TOKEN`:
 /start
 /create My Mantle Risk Agent
 /register
+/groq gsk-... llama-3.1-8b-instant
 /openai sk-... gpt-4.1-mini
 /watch 0xYourMantleWallet
 /policy Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.
@@ -90,7 +97,7 @@ Then message the bot configured by `TELEGRAM_BOT_TOKEN`:
 /proof
 ```
 
-Inline buttons are available for setup, ERC-8004 registration, OpenAI setup guidance, wallet changes, and proof links. `/simulate` is intentionally demo-only; live alerts come from the Mantle monitor after `/watch`, `/policy`, and `/monitor`.
+Inline buttons are available for setup, ERC-8004 registration, hosted AI setup guidance, wallet changes, and proof links. `/simulate` is intentionally demo-only; live alerts come from the Mantle monitor after `/watch`, `/policy`, and `/monitor`.
 
 Demo shortcuts are disabled by default. To expose `/demo` and demo wallet buttons in a non-production environment, set:
 
@@ -102,7 +109,7 @@ MANTSENT_ENABLE_DEMO_MODE=true
 
 1. Create a named MantSent agent in Telegram.
 2. Register the agent through the configured ERC-8004 Identity Registry.
-3. Optionally add an OpenAI API key for richer alert explanations.
+3. Optionally add a Groq or OpenAI API key for richer alert explanations.
 4. Watch one real Mantle wallet.
 5. Commit a policy for MNT outflows greater than the threshold to first-seen recipients.
 6. Enable live Mantle monitoring.

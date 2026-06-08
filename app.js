@@ -271,7 +271,7 @@ function analyticsDashboardView() {
           <div class="status-stack">
             ${statusBadge("Agent ID", `#${agent.id}`, state.agentCreated ? "good" : "warn")}
             ${statusBadge("Identity", agent.identityStatus === "erc8004-registered" ? "ERC-8004 registered" : "Local profile", agent.identityStatus === "erc8004-registered" ? "good" : "warn")}
-            ${statusBadge("AI", state.aiProvider === "openai" && state.openAiConfigured ? "OpenAI enhanced" : state.aiProvider, state.aiProvider === "openai" && state.openAiConfigured ? "good" : "neutral")}
+            ${statusBadge("AI", aiLabel(), state.openAiConfigured ? "good" : "neutral")}
           </div>
         </article>
 
@@ -329,6 +329,13 @@ function nextStep() {
   if (!state.policyActive) return "Commit the policy with /policy";
   if (!state.monitorActive) return "Enable Mantle polling with /monitor";
   return state.transferDetected ? "Review latest signal in Telegram" : "Watching for policy matches";
+}
+function aiLabel() {
+  if (!state.openAiConfigured) return state.aiProvider;
+  if (state.aiProvider === "openai") return "OpenAI enhanced";
+  if (state.aiProvider === "groq") return "Groq enhanced";
+  if (state.aiProvider === "ollama") return "Ollama local";
+  return state.aiProvider;
 }
 
 // src/shared/branding.ts

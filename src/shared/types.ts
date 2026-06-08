@@ -43,7 +43,7 @@ export interface Incident {
   outcomeTxHash?: string;
 }
 
-export type AiProvider = "template" | "openai" | "ollama";
+export type AiProvider = "template" | "openai" | "groq" | "ollama";
 
 export interface AppState {
   agentCreated: boolean;
@@ -100,6 +100,8 @@ export interface RuntimeEnv {
   AI_PROVIDER?: AiProvider;
   OPENAI_MODEL?: string;
   OPENAI_API_KEY?: string;
+  GROQ_API_KEY?: string;
+  GROQ_MODEL?: string;
   OLLAMA_BASE_URL?: string;
   OLLAMA_MODEL?: string;
 }

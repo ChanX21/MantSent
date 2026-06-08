@@ -12,13 +12,13 @@ const demoPolicy = "Alert me if more than 10 MNT leaves this wallet, especially 
 const setupText =
   "<b>Set up live wallet monitoring</b>\n" +
   "1. <code>/deploy My Agent Name</code>\n" +
-  "2. <code>/openai sk-... gpt-4.1-mini</code> optional\n" +
+  "2. <code>/groq gsk-... llama-3.1-8b-instant</code> optional\n" +
   "3. <code>/watch 0xYourMantleWallet</code>\n" +
   "4. <code>/policy Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.</code>\n" +
   "5. <code>/monitor</code>";
 const aiSetupText =
   "<b>Optional AI upgrade</b>\n" +
-  "Send <code>/openai sk-... gpt-4.1-mini</code> to use OpenAI for richer agent explanations.\n\n" +
+  "Send <code>/groq gsk-... llama-3.1-8b-instant</code> for Groq explanations, or <code>/openai sk-... gpt-4.1-mini</code> for OpenAI.\n\n" +
   "The key is stored in the local deployment environment and is never shown back in Telegram.";
 
 export interface TelegramUpdate {
@@ -208,6 +208,15 @@ export function createTelegramService({
         await actions.run("configure_ai", { provider: "openai", apiKey, model });
         await call("sendMessage", { chat_id: chatId, text: "<b>OpenAI agent explanations enabled.</b>\nFuture alerts will use the configured OpenAI model.", parse_mode: "HTML" });
         await sendStatus(chatId);
+      } else if (command === "/groq") {
+        const [apiKey, model] = args.split(/\s+/);
+        if (!apiKey) {
+          await call("sendMessage", { chat_id: chatId, text: aiSetupText, parse_mode: "HTML" });
+          return;
+        }
+        await actions.run("configure_ai", { provider: "groq", apiKey, model });
+        await call("sendMessage", { chat_id: chatId, text: "<b>Groq agent explanations enabled.</b>\nFuture alerts will use the configured Groq model.", parse_mode: "HTML" });
+        await sendStatus(chatId);
       } else if (command === "/watch") {
         if (!args) {
           await promptForWallet(chatId);
@@ -273,7 +282,7 @@ export function createTelegramService({
         await call("sendMessage", {
           chat_id: chatId,
           text:
-            `<b>Commands</b>\n/deploy [agent name]\n/create [agent name]\n/register [agentURI]\n/openai sk-... [model]\n/watch 0x...\n/policy alert me if more than 10 MNT leaves\n/monitor\n/proof\n/reset\n/redeploy${demoMode ? "\n/demo" : ""}`,
+            `<b>Commands</b>\n/deploy [agent name]\n/create [agent name]\n/register [agentURI]\n/groq gsk-... [model]\n/openai sk-... [model]\n/watch 0x...\n/policy alert me if more than 10 MNT leaves\n/monitor\n/proof\n/reset\n/redeploy${demoMode ? "\n/demo" : ""}`,
           parse_mode: "HTML",
         });
       }
@@ -394,6 +403,7 @@ function commandsFor(demoMode: boolean): TelegramCommand[] {
     { command: "policy", description: "Commit an alert policy on Mantle" },
     { command: "monitor", description: "Enable live Mantle wallet monitoring" },
     { command: "openai", description: "Add an OpenAI key for richer explanations" },
+    { command: "groq", description: "Add a Groq key for hosted local-style explanations" },
     { command: "proof", description: "Show agent, policy, alert, and outcome proofs" },
     { command: "reset", description: "Reset this deployment state" },
   ];
@@ -428,7 +438,7 @@ ${nextStep(state)}
 ${setupProgress(state)}
 
 <b>Agent</b>
-<code>#${escapeHtml(state.agentId)}</code> · ${state.agentIdentityStatus === "erc8004-registered" ? "ERC-8004" : "Local profile"} · ${state.aiProvider === "openai" && state.openAiConfigured ? "OpenAI" : escapeHtml(state.aiProvider)}
+<code>#${escapeHtml(state.agentId)}</code> · ${state.agentIdentityStatus === "erc8004-registered" ? "ERC-8004" : "Local profile"} · ${aiLabel(state)}
 
 <b>Monitoring</b>
 Wallet: ${state.watchedWallet ? `<code>${escapeHtml(shortAddress(state.watchedWallet))}</code>` : "Not set"}
@@ -461,6 +471,13 @@ function proofLink(label: string, txHash: string, chainId?: string): string {
   return `<a href="${mantleTxUrl(txHash, chainId)}">${label} proof</a>`;
 }
 
+function aiLabel(state: PublicState): string {
+  if (state.aiProvider === "openai" && state.openAiConfigured) return "OpenAI";
+  if (state.aiProvider === "groq" && state.openAiConfigured) return "Groq";
+  if (state.aiProvider === "ollama" && state.openAiConfigured) return "Ollama";
+  return escapeHtml(state.aiProvider);
+}
+
 function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -476,14 +493,14 @@ function buttonsFor(state: PublicState, chainId?: string, demoMode = false): Inl
     return [
       [{ text: "Register ERC-8004 Agent", callback_data: "register_agent" }],
       [{ text: "Set Real Wallet", callback_data: "wallet_setup" }],
-      [{ text: "Add OpenAI Key", callback_data: "ai_setup" }],
+      [{ text: "Add AI Key", callback_data: "ai_setup" }],
       managementButtons(),
     ];
   }
   if (!state.walletWatched) {
     const rows: InlineKeyboard = [
       [{ text: "Set Real Wallet", callback_data: "wallet_setup" }],
-      [{ text: "Add OpenAI Key", callback_data: "ai_setup" }],
+      [{ text: "Add AI Key", callback_data: "ai_setup" }],
       managementButtons(),
     ];
     if (demoMode) rows.splice(2, 0, [{ text: "Use Demo Wallet", callback_data: "watch_demo" }]);
