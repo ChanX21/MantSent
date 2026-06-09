@@ -201,7 +201,9 @@ async function simulateTransfer(env: RuntimeEnv, payload: ActionPayload): Promis
     recipient,
     outflowAmountMnt: "25",
     source: "demo",
+    policy,
     thresholdMnt: policy.thresholdMnt,
+    direction: "outgoing",
     llm,
   });
 

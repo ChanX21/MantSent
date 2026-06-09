@@ -61,7 +61,10 @@ export async function buildIncident(input: {
   recipient: string;
   outflowAmountMnt: string;
   source: EvidenceSource;
+  policy: PolicyRule;
   thresholdMnt: number;
+  recentTransactionCount?: number;
+  direction?: "incoming" | "outgoing";
   llm: AgentLlmProvider;
 }): Promise<Incident> {
   const explanationInput = {
@@ -72,6 +75,10 @@ export async function buildIncident(input: {
     source: input.source,
     severity: input.decision.severity,
     evidenceTxHash: input.evidenceTxHash,
+    policy: input.policy,
+    reasonCodes: input.decision.reasonCodes,
+    recentTransactionCount: input.recentTransactionCount,
+    direction: input.direction,
   };
 
   return {

@@ -106,7 +106,10 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
     recipient,
     outflowAmountMnt: formatMnt(tx.value),
     source: "mantle-transaction",
+    policy,
     thresholdMnt: policy.thresholdMnt,
+    recentTransactionCount: recentTransactions.length,
+    direction,
     llm,
   });
 

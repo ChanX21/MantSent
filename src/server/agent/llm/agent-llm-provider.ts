@@ -1,4 +1,4 @@
-import type { AiProvider, EvidenceSource, RuntimeEnv } from "../../../shared/types.js";
+import type { AiProvider, EvidenceSource, PolicyRule, RuntimeEnv } from "../../../shared/types.js";
 
 export interface AlertExplanationInput {
   amountMnt: string;
@@ -8,6 +8,10 @@ export interface AlertExplanationInput {
   source: EvidenceSource;
   severity: "CRITICAL" | "HIGH";
   evidenceTxHash: string;
+  policy: PolicyRule;
+  reasonCodes: string[];
+  recentTransactionCount?: number;
+  direction?: "incoming" | "outgoing";
 }
 
 export interface AgentLlmProvider {
@@ -18,7 +22,12 @@ export interface AgentLlmProvider {
 export function templateExplanation(input: AlertExplanationInput): string {
   const sourcePhrase = input.source === "mantle-transaction" ? "a confirmed Mantle transaction" : "a simulated demo event";
   const noveltyPhrase = input.recipientFirstSeen ? "first-seen recipient" : "known recipient";
-  return `MantSent detected ${input.amountMnt} MNT leaving the watched wallet via ${sourcePhrase}. The active policy triggers above ${input.thresholdMnt} MNT, and the recipient is a ${noveltyPhrase}. Review signer intent before marking the outcome.`;
+  const policyPhrase = input.policy.transactionCountThreshold
+    ? `${input.policy.transactionCountThreshold}+ transactions within ${Math.round((input.policy.transactionWindowSeconds || 300) / 60)} minutes`
+    : input.policy.triggerOnAnyTransaction
+      ? "any matching transaction"
+      : `native MNT movement above ${input.thresholdMnt} MNT`;
+  return `MantSent detected ${input.direction || "wallet"} activity via ${sourcePhrase}: ${input.amountMnt} MNT involving ${input.recipient}. The active policy is ${policyPhrase}; triggered signals: ${input.reasonCodes.join(", ") || "policy match"}. Recipient is a ${noveltyPhrase}. Review signer intent and transaction context before assigning an outcome.`;
 }
 
 export function configuredAiProvider(env: RuntimeEnv): AiProvider {
@@ -32,10 +41,13 @@ export function configuredAiProvider(env: RuntimeEnv): AiProvider {
 
 export function alertSystemPrompt(): string {
   return [
-    "Write a maximum 70-word treasury anomaly explanation.",
-    "Use only supplied evidence.",
-    "Say 'may indicate' and never assert theft.",
-    "Include the policy trigger and recommend checking signer activity.",
+    "Write a concise treasury security analyst note, maximum 95 words.",
+    "Use only supplied evidence. Do not guess hidden intent, counterparties, or contract purpose.",
+    "Explain the exact compiled policy trigger in plain English, including burst windows or direction when present.",
+    "Use the reasonCodes field as the source of why the alert fired.",
+    "Do not mention implementation field names such as thresholdMnt, rawText, or reasonCodes.",
+    "Say 'may indicate' and never assert theft or compromise as fact.",
+    "End with a concrete review action for the signer and transaction proof.",
     "Do not provide trading or investment advice.",
   ].join(" ");
 }

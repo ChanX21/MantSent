@@ -26,8 +26,8 @@ export class GroqAgentProvider implements AgentLlmProvider {
           { role: "system", content: alertSystemPrompt() },
           { role: "user", content: JSON.stringify(input) },
         ],
-        temperature: 0.2,
-        max_tokens: 120,
+        temperature: 0.1,
+        max_tokens: 150,
       }),
     });
 

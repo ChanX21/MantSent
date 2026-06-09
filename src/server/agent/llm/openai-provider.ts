@@ -22,6 +22,7 @@ export class OpenAiAgentProvider implements AgentLlmProvider {
           { role: "system", content: alertSystemPrompt() },
           { role: "user", content: JSON.stringify(input) },
         ],
+        temperature: 0.1,
       }),
     });
 
