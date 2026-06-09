@@ -142,6 +142,7 @@ function aiLabel(): string {
 
 function policyTitle(): string {
   if (!state.policyActive || !state.policy) return "Not set";
+  if (state.policy.transactionCountThreshold) return `${state.policy.transactionCountThreshold}+ tx burst`;
   if (state.policy.triggerOnAnyTransaction) return "Any transaction";
   if (state.thresholdMnt <= 0) return "Any MNT outflow";
   return `>${state.thresholdMnt} MNT`;

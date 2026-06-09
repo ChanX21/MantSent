@@ -126,6 +126,7 @@ function watchWallet(payload: ActionPayload): AppState {
     state.monitorActive = false;
     state.monitorCursorBlock = 0;
     state.seenRecipients = [];
+    state.recentTransactions = [];
     state.incidents = [];
   });
 }
@@ -148,6 +149,7 @@ async function activatePolicy(env: RuntimeEnv, payload: ActionPayload): Promise<
     state.lastAlertHash = "";
     state.monitorActive = false;
     state.monitorCursorBlock = 0;
+    state.recentTransactions = [];
     state.incidents = [];
   });
   const proof = await commitPolicyProof(env, before);
@@ -251,6 +253,7 @@ function resetDemo(env: RuntimeEnv): AppState {
       monitorActive: false,
       monitorCursorBlock: 0,
       seenRecipients: [],
+      recentTransactions: [],
       incidents: [],
       agentId,
       agentUri: env.MANTSENT_AGENT_URI || state.agentUri || defaultAgentUri(env),

@@ -11,6 +11,8 @@ export interface PolicyRule {
   thresholdMnt: number;
   escalateNewRecipient: boolean;
   triggerOnAnyTransaction?: boolean;
+  transactionCountThreshold?: number;
+  transactionWindowSeconds?: number;
   rawText: string;
 }
 
@@ -73,6 +75,7 @@ export interface AppState {
   lastAlertHash: string;
   monitorCursorBlock: number;
   seenRecipients: string[];
+  recentTransactions: Array<{ hash: string; timestamp: number }>;
   chatIds: number[];
   incidents: Incident[];
 }

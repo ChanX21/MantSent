@@ -99,7 +99,7 @@ function alertCard() {
       <p>Large outflow to a first-seen recipient may indicate an unauthorized payout or compromised signer action.</p>
       <div class="alert-facts">
         <span>Recipient ${recipient}</span>
-        <span>Policy ${state.policy?.triggerOnAnyTransaction ? "any outgoing transaction" : state.thresholdMnt <= 0 ? "any MNT outflow" : `>${state.thresholdMnt} MNT`}</span>
+        <span>Policy ${state.policy?.transactionCountThreshold ? `${state.policy.transactionCountThreshold}+ tx burst` : state.policy?.triggerOnAnyTransaction ? "any outgoing transaction" : state.thresholdMnt <= 0 ? "any MNT outflow" : `>${state.thresholdMnt} MNT`}</span>
         <span>Evidence ${short(evidence)}</span>
       </div>
     </div>
@@ -341,6 +341,7 @@ function aiLabel() {
 }
 function policyTitle() {
   if (!state.policyActive || !state.policy) return "Not set";
+  if (state.policy.transactionCountThreshold) return `${state.policy.transactionCountThreshold}+ tx burst`;
   if (state.policy.triggerOnAnyTransaction) return "Any transaction";
   if (state.thresholdMnt <= 0) return "Any MNT outflow";
   return `>${state.thresholdMnt} MNT`;

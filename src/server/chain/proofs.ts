@@ -32,7 +32,9 @@ export async function commitPolicyProof(env: RuntimeEnv, state: AppState): Promi
     watchedWallet,
     thresholdMnt: state.thresholdMnt,
     asset: "MNT",
-    trigger: state.policy?.triggerOnAnyTransaction ? "any-outgoing-transaction" : "mnt-outflow-threshold",
+    trigger: state.policy?.transactionCountThreshold ? "transaction-frequency" : state.policy?.triggerOnAnyTransaction ? "any-outgoing-transaction" : "mnt-outflow-threshold",
+    transactionCountThreshold: state.policy?.transactionCountThreshold || null,
+    transactionWindowSeconds: state.policy?.transactionWindowSeconds || null,
     escalation: state.policy?.escalateNewRecipient ? "new-recipient" : "threshold-only",
     rawText: state.policy?.rawText || "",
   });

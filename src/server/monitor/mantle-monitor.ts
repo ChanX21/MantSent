@@ -58,9 +58,11 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
   if (state.incidents.some((incident) => incident.evidenceTxHash.toLowerCase() === tx.hash.toLowerCase())) return;
 
   const policy = state.policy ?? parsePolicy();
-  if (tx.value <= 0n && !policy.triggerOnAnyTransaction) return;
+  if (tx.value <= 0n && !policy.triggerOnAnyTransaction && !policy.transactionCountThreshold) return;
   const amountMnt = Number(formatMnt(tx.value));
   const recipient = normalizeAddress(tx.to);
+  const timestamp = Math.floor(Date.now() / 1000);
+  const recentTransactions = recentTransactionsForPolicy(state.recentTransactions || [], tx.hash, timestamp, policy.transactionWindowSeconds);
   const decision = evaluateAgentTransfer(
     { ...state, policy },
     {
@@ -68,10 +70,12 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
       from: tx.from,
       to: recipient,
       amountMnt,
+      recentTransactionCount: recentTransactions.length,
     },
   );
 
   mutateState((current) => {
+    current.recentTransactions = recentTransactions;
     if (!current.seenRecipients.map((address) => address.toLowerCase()).includes(recipient.toLowerCase())) {
       current.seenRecipients.push(recipient);
     }
@@ -112,4 +116,16 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
     current.incidents.unshift(incident);
   });
   await onIncident?.(incident);
+}
+
+function recentTransactionsForPolicy(
+  existing: Array<{ hash: string; timestamp: number }>,
+  hash: string,
+  timestamp: number,
+  windowSeconds = 300,
+): Array<{ hash: string; timestamp: number }> {
+  const cutoff = timestamp - windowSeconds;
+  const deduped = existing.filter((entry) => entry.timestamp >= cutoff && entry.hash.toLowerCase() !== hash.toLowerCase());
+  deduped.push({ hash, timestamp });
+  return deduped;
 }

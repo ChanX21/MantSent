@@ -32,6 +32,7 @@ const defaultState: AppState = {
   lastAlertHash: "",
   monitorCursorBlock: 0,
   seenRecipients: [],
+  recentTransactions: [],
   chatIds: [],
   incidents: [],
 };
@@ -43,6 +44,7 @@ export function loadState(path = statePath): AppState {
   loaded.agentRegistrationTxHash ||= "";
   loaded.aiProvider ||= "template";
   loaded.openAiConfigured ||= false;
+  loaded.recentTransactions ||= [];
   sanitizeLegacyDemoState(loaded);
   loaded.incidents = loaded.incidents.map((incident) => ({
     ...incident,
@@ -83,6 +85,7 @@ function sanitizeLegacyDemoState(state: AppState): void {
     lastAlertHash: "",
     monitorCursorBlock: 0,
     seenRecipients: [],
+    recentTransactions: [],
     incidents: [],
   });
 }
