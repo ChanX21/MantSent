@@ -1,5 +1,5 @@
 import type { TransactionResponse } from "ethers";
-import type { RuntimeEnv } from "../../shared/types.js";
+import type { Incident, RuntimeEnv } from "../../shared/types.js";
 import { buildIncident, evaluateAgentTransfer } from "../agent/single-wallet-monitoring-agent.js";
 import { createAgentLlmProvider } from "../agent/llm/provider-factory.js";
 import { formatMnt, normalizeAddress, provider } from "../chain/mantle.js";
@@ -11,7 +11,7 @@ const pollIntervalMs = 15_000;
 const confirmations = 2;
 const maxBlocksPerTick = 12;
 
-export function startMantleMonitor(env: RuntimeEnv): void {
+export function startMantleMonitor(env: RuntimeEnv, onIncident?: (incident: Incident) => Promise<void> | void): void {
   const rpc = provider(env);
 
   async function tick(): Promise<void> {
@@ -25,7 +25,7 @@ export function startMantleMonitor(env: RuntimeEnv): void {
     if (toBlock < fromBlock) return;
 
     for (let blockNumber = fromBlock; blockNumber <= toBlock; blockNumber += 1) {
-      await scanBlock(env, blockNumber);
+      await scanBlock(env, blockNumber, onIncident);
     }
 
     mutateState((current) => {
@@ -40,17 +40,17 @@ export function startMantleMonitor(env: RuntimeEnv): void {
   tick().catch((error) => console.error(`Mantle monitor error: ${(error as Error).message}`));
 }
 
-async function scanBlock(env: RuntimeEnv, blockNumber: number): Promise<void> {
+async function scanBlock(env: RuntimeEnv, blockNumber: number, onIncident?: (incident: Incident) => Promise<void> | void): Promise<void> {
   const rpc = provider(env);
   const block = await rpc.getBlock(blockNumber, true);
   if (!block) return;
 
   for (const tx of block.prefetchedTransactions) {
-    await maybeProcessTransaction(env, tx);
+    await maybeProcessTransaction(env, tx, onIncident);
   }
 }
 
-async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse): Promise<void> {
+async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse, onIncident?: (incident: Incident) => Promise<void> | void): Promise<void> {
   const state = loadState();
   if (!state.monitorActive || !state.walletWatched || !state.policyActive || !state.watchedWallet) return;
   if (!tx.to) return;
@@ -111,4 +111,5 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse)
     current.lastAlertHash = proof.alertHash || "";
     current.incidents.unshift(incident);
   });
+  await onIncident?.(incident);
 }
