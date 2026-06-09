@@ -31,12 +31,14 @@ function normalizePolicyText(text: string): string {
 }
 
 function anyTransactionPolicy(text: string): boolean {
-  return /\b(any|every|all)\b.*\b(transaction|tx|activity)\b|\b(transaction|tx|activity)\b.*\b(happens|occurs|sent|send|submitted|made|received)\b/i.test(text);
+  return /\b(any|every|all)\b.*\b(transaction|transactions|tx|txs|txn|txns|activity)\b|\b(transaction|transactions|tx|txs|txn|txns|activity)\b.*\b(happens|occurs|sent|send|submitted|made|received)\b/i.test(text);
 }
 
 function frequencyPolicy(text: string): { count: number; windowSeconds: number } | null {
-  if (!/\b(multiple|many|several|burst|too many)\b.*\b(transaction|tx|transfer)s?\b|\b(transaction|tx|transfer)s?\b.*\b(within|in|over)\b/i.test(text)) return null;
-  const countMatch = text.match(/(?:more than|over|above|>=?)\s*(\d+)\s*(?:transaction|tx|transfer)s?/i) ?? text.match(/(\d+)\s*(?:transaction|tx|transfer)s?/i);
+  if (!/\b(multiple|many|several|burst|too many)\b.*\b(transaction|transactions|tx|txs|txn|txns|transfer|transfers)\b|\b(transaction|transactions|tx|txs|txn|txns|transfer|transfers)\b.*\b(within|in|over)\b/i.test(text)) return null;
+  const countMatch =
+    text.match(/(?:more than|over|above|>=?)\s*(\d+)\s*(?:transaction|transactions|tx|txs|txn|txns|transfer|transfers)\b/i) ??
+    text.match(/(\d+)\s*(?:transaction|transactions|tx|txs|txn|txns|transfer|transfers)\b/i);
   const minuteMatch = text.match(/(\d+)\s*(?:min|mins|minute|minutes)\b/i);
   const secondMatch = text.match(/(\d+)\s*(?:sec|secs|second|seconds)\b/i);
   return {
