@@ -176,6 +176,7 @@ async function simulateTransfer(env: RuntimeEnv, payload: ActionPayload): Promis
       from: current.watchedWallet,
       to: recipient,
       amountMnt: 25,
+      direction: "outgoing",
     },
   );
 

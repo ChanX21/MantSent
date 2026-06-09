@@ -5,6 +5,7 @@ export interface TransferCandidate {
   from: string;
   to: string;
   amountMnt: number;
+  direction: "incoming" | "outgoing";
   recentTransactionCount?: number;
 }
 
@@ -16,6 +17,16 @@ export interface PolicyDecision {
 }
 
 export function evaluateTransfer(policy: PolicyRule, transfer: TransferCandidate, seenRecipients: string[]): PolicyDecision {
+  const directionMatches = !policy.direction || policy.direction === "both" || policy.direction === transfer.direction;
+  if (!directionMatches) {
+    return {
+      shouldAlert: false,
+      severity: "HIGH",
+      reasonCodes: [],
+      recipientFirstSeen: false,
+    };
+  }
+
   const frequencyBreached = Boolean(
     policy.transactionCountThreshold &&
       policy.transactionWindowSeconds &&

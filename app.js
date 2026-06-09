@@ -348,7 +348,8 @@ function policyTitle() {
 }
 function policyDetail() {
   if (!state.policy) return "Policy active";
-  return state.policy.rawText || (state.policy.escalateNewRecipient ? "Escalate new recipients" : "Threshold-only outflow rule");
+  const direction = state.policy.direction && state.policy.direction !== "both" ? `${state.policy.direction} only` : "incoming and outgoing";
+  return state.policy.rawText ? `${state.policy.rawText} (${direction})` : state.policy.escalateNewRecipient ? `Escalate new recipients (${direction})` : `Threshold rule (${direction})`;
 }
 
 // src/shared/branding.ts

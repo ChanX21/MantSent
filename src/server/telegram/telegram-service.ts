@@ -443,6 +443,7 @@ ${setupProgress(state)}
 <b>Monitoring</b>
 Wallet: ${state.watchedWallet ? `<code>${escapeHtml(shortAddress(state.watchedWallet))}</code>` : "Not set"}
 Policy: ${state.policyActive ? escapeHtml(policySummary(state)) : "Not set"}
+Scope: ${state.policyActive ? escapeHtml(policyScope(state)) : "Not set"}
 Monitor: ${state.monitorActive ? "Live" : "Off"}${latest ? `
 
 <b>Latest signal</b>
@@ -479,6 +480,12 @@ function policySummary(state: PublicState): string {
   const threshold = state.thresholdMnt <= 0 ? "any MNT outflow" : `>${state.thresholdMnt} MNT`;
   const recipient = state.policy.escalateNewRecipient ? ", new recipient escalation" : "";
   return `${threshold}${recipient}`;
+}
+
+function policyScope(state: PublicState): string {
+  const direction = state.policy?.direction || "both";
+  const zeroValue = state.policy?.includeZeroValue ? ", includes zero-value calls" : "";
+  return `${direction} native Mantle transactions${zeroValue}`;
 }
 
 function aiLabel(state: PublicState): string {

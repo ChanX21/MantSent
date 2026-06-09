@@ -54,13 +54,15 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
   const state = loadState();
   if (!state.monitorActive || !state.walletWatched || !state.policyActive || !state.watchedWallet) return;
   if (!tx.to) return;
-  if (tx.from.toLowerCase() !== state.watchedWallet.toLowerCase()) return;
+  const watchedWallet = state.watchedWallet.toLowerCase();
+  const direction = tx.from.toLowerCase() === watchedWallet ? "outgoing" : tx.to.toLowerCase() === watchedWallet ? "incoming" : null;
+  if (!direction) return;
   if (state.incidents.some((incident) => incident.evidenceTxHash.toLowerCase() === tx.hash.toLowerCase())) return;
 
   const policy = state.policy ?? parsePolicy();
-  if (tx.value <= 0n && !policy.triggerOnAnyTransaction && !policy.transactionCountThreshold) return;
+  if (tx.value <= 0n && !policy.includeZeroValue && !policy.triggerOnAnyTransaction && !policy.transactionCountThreshold) return;
   const amountMnt = Number(formatMnt(tx.value));
-  const recipient = normalizeAddress(tx.to);
+  const recipient = normalizeAddress(direction === "outgoing" ? tx.to : tx.from);
   const timestamp = Math.floor(Date.now() / 1000);
   const recentTransactions = recentTransactionsForPolicy(state.recentTransactions || [], tx.hash, timestamp, policy.transactionWindowSeconds);
   const decision = evaluateAgentTransfer(
@@ -70,6 +72,7 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
       from: tx.from,
       to: recipient,
       amountMnt,
+      direction,
       recentTransactionCount: recentTransactions.length,
     },
   );

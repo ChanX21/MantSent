@@ -33,6 +33,8 @@ export async function commitPolicyProof(env: RuntimeEnv, state: AppState): Promi
     thresholdMnt: state.thresholdMnt,
     asset: "MNT",
     trigger: state.policy?.transactionCountThreshold ? "transaction-frequency" : state.policy?.triggerOnAnyTransaction ? "any-outgoing-transaction" : "mnt-outflow-threshold",
+    direction: state.policy?.direction || "outgoing",
+    includeZeroValue: Boolean(state.policy?.includeZeroValue),
     transactionCountThreshold: state.policy?.transactionCountThreshold || null,
     transactionWindowSeconds: state.policy?.transactionWindowSeconds || null,
     escalation: state.policy?.escalateNewRecipient ? "new-recipient" : "threshold-only",

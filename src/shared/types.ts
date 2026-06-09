@@ -10,6 +10,8 @@ export interface PolicyRule {
   asset: "MNT";
   thresholdMnt: number;
   escalateNewRecipient: boolean;
+  direction?: "incoming" | "outgoing" | "both";
+  includeZeroValue?: boolean;
   triggerOnAnyTransaction?: boolean;
   transactionCountThreshold?: number;
   transactionWindowSeconds?: number;

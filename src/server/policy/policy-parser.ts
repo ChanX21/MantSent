@@ -2,12 +2,16 @@ import type { PolicyRule } from "../../shared/types.js";
 
 export function parsePolicy(text = ""): PolicyRule {
   const cleanText = normalizePolicyText(text);
+  assertSupportedPolicy(cleanText);
   const triggerOnAnyTransaction = anyTransactionPolicy(cleanText);
   const frequency = frequencyPolicy(cleanText);
+  const direction = directionFromText(cleanText);
   return {
     asset: "MNT",
     thresholdMnt: thresholdFromText(cleanText, triggerOnAnyTransaction),
     escalateNewRecipient: /new|first[-\s]?seen|unknown|fresh/i.test(cleanText),
+    direction,
+    includeZeroValue: triggerOnAnyTransaction || Boolean(frequency),
     triggerOnAnyTransaction,
     transactionCountThreshold: frequency?.count,
     transactionWindowSeconds: frequency?.windowSeconds,
@@ -27,7 +31,7 @@ function normalizePolicyText(text: string): string {
 }
 
 function anyTransactionPolicy(text: string): boolean {
-  return /\b(any|every|all)\b.*\b(transaction|tx)\b|\b(transaction|tx)\b.*\b(happens|occurs|sent|send|submitted|made)\b/i.test(text);
+  return /\b(any|every|all)\b.*\b(transaction|tx|activity)\b|\b(transaction|tx|activity)\b.*\b(happens|occurs|sent|send|submitted|made|received)\b/i.test(text);
 }
 
 function frequencyPolicy(text: string): { count: number; windowSeconds: number } | null {
@@ -39,4 +43,19 @@ function frequencyPolicy(text: string): { count: number; windowSeconds: number }
     count: Number(countMatch?.[1] ?? 2),
     windowSeconds: minuteMatch?.[1] ? Number(minuteMatch[1]) * 60 : Number(secondMatch?.[1] ?? 300),
   };
+}
+
+function directionFromText(text: string): "incoming" | "outgoing" | "both" {
+  if (/\b(incoming|received?|receives?|deposit|deposits|inbound)\b/i.test(text)) return "incoming";
+  if (/\b(outgoing|sent|send|sends|leaves?|outflow|withdraw|withdraws|spend|spends)\b/i.test(text)) return "outgoing";
+  return "both";
+}
+
+function assertSupportedPolicy(text: string): void {
+  if (/\b(erc[-\s]?20|token|usdc|usdt|nft|erc[-\s]?721|erc[-\s]?1155)\b/i.test(text)) {
+    throw new Error("This policy needs token/NFT event indexing. Current live monitor supports native Mantle transactions only.");
+  }
+  if (/\b(failed|reverted|gas|fee|swap|bridge|contract event|log)\b/i.test(text)) {
+    throw new Error("This policy needs receipt/log indexing. Current live monitor supports transaction-level native Mantle policies.");
+  }
 }
