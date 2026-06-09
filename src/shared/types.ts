@@ -10,6 +10,7 @@ export interface PolicyRule {
   asset: "MNT";
   thresholdMnt: number;
   escalateNewRecipient: boolean;
+  triggerOnAnyTransaction?: boolean;
   rawText: string;
 }
 

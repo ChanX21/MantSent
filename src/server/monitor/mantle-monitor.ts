@@ -53,11 +53,12 @@ async function scanBlock(env: RuntimeEnv, blockNumber: number): Promise<void> {
 async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse): Promise<void> {
   const state = loadState();
   if (!state.monitorActive || !state.walletWatched || !state.policyActive || !state.watchedWallet) return;
-  if (!tx.to || tx.value <= 0n) return;
+  if (!tx.to) return;
   if (tx.from.toLowerCase() !== state.watchedWallet.toLowerCase()) return;
   if (state.incidents.some((incident) => incident.evidenceTxHash.toLowerCase() === tx.hash.toLowerCase())) return;
 
   const policy = state.policy ?? parsePolicy();
+  if (tx.value <= 0n && !policy.triggerOnAnyTransaction) return;
   const amountMnt = Number(formatMnt(tx.value));
   const recipient = normalizeAddress(tx.to);
   const decision = evaluateAgentTransfer(

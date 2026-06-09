@@ -474,6 +474,7 @@ function proofLink(label: string, txHash: string, chainId?: string): string {
 function policySummary(state: PublicState): string {
   if (!state.policyActive || !state.policy) return "Not set";
   if (state.policy.rawText) return state.policy.rawText;
+  if (state.policy.triggerOnAnyTransaction) return "any outgoing transaction";
   const threshold = state.thresholdMnt <= 0 ? "any MNT outflow" : `>${state.thresholdMnt} MNT`;
   const recipient = state.policy.escalateNewRecipient ? ", new recipient escalation" : "";
   return `${threshold}${recipient}`;

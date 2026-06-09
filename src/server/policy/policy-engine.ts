@@ -15,10 +15,11 @@ export interface PolicyDecision {
 }
 
 export function evaluateTransfer(policy: PolicyRule, transfer: TransferCandidate, seenRecipients: string[]): PolicyDecision {
-  const thresholdBreached = transfer.amountMnt > policy.thresholdMnt;
+  const thresholdBreached = Boolean(policy.triggerOnAnyTransaction) || transfer.amountMnt > policy.thresholdMnt;
   const recipientFirstSeen = !seenRecipients.map((address) => address.toLowerCase()).includes(transfer.to.toLowerCase());
   const reasonCodes = [];
 
+  if (policy.triggerOnAnyTransaction) reasonCodes.push("ANY_OUTGOING_TRANSACTION");
   if (thresholdBreached) reasonCodes.push("THRESHOLD_BREACH");
   if (policy.escalateNewRecipient && recipientFirstSeen) reasonCodes.push("NEW_RECIPIENT");
 
