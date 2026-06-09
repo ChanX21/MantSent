@@ -182,7 +182,7 @@ export function createTelegramService({
           parse_mode: "HTML",
         });
         await sendStatus(chatId);
-      } else if (looksLikePolicy(text) && actions.state().walletWatched) {
+      } else if (!command?.startsWith("/") && looksLikePolicy(text) && actions.state().walletWatched) {
         await securePolicy(chatId, text.trim());
       } else if (command === "/create") {
         await actions.run("create", { name: args || undefined });
@@ -442,7 +442,7 @@ ${setupProgress(state)}
 
 <b>Monitoring</b>
 Wallet: ${state.watchedWallet ? `<code>${escapeHtml(shortAddress(state.watchedWallet))}</code>` : "Not set"}
-Policy: ${state.policyActive ? `&gt;${state.thresholdMnt} MNT, new recipient escalation` : "Not set"}
+Policy: ${state.policyActive ? escapeHtml(policySummary(state)) : "Not set"}
 Monitor: ${state.monitorActive ? "Live" : "Off"}${latest ? `
 
 <b>Latest signal</b>
@@ -469,6 +469,14 @@ function proofLines(state: PublicState, chainId?: string): string {
 
 function proofLink(label: string, txHash: string, chainId?: string): string {
   return `<a href="${mantleTxUrl(txHash, chainId)}">${label} proof</a>`;
+}
+
+function policySummary(state: PublicState): string {
+  if (!state.policyActive || !state.policy) return "Not set";
+  if (state.policy.rawText) return state.policy.rawText;
+  const threshold = state.thresholdMnt <= 0 ? "any MNT outflow" : `>${state.thresholdMnt} MNT`;
+  const recipient = state.policy.escalateNewRecipient ? ", new recipient escalation" : "";
+  return `${threshold}${recipient}`;
 }
 
 function aiLabel(state: PublicState): string {

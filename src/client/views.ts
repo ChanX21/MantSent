@@ -14,7 +14,7 @@ export function analyticsDashboardView(): string {
       <section class="kpi-grid" aria-label="MantSent analytics summary">
         ${analyticsCard("Monitoring", state.monitorActive ? "Live" : "Off", state.monitorActive ? "Polling Mantle for wallet outflows" : "Start monitoring from Telegram", state.monitorActive ? "good" : "warn")}
         ${analyticsCard("Watched wallet", agent.wallet ? short(agent.wallet) : "Not set", agent.wallet ? "Single-wallet scope is configured" : "Use /watch in Telegram", agent.wallet ? "good" : "warn")}
-        ${analyticsCard("Policy", state.policyActive ? `>${state.thresholdMnt} MNT` : "Not set", state.policyActive ? "New-recipient outflow rule is active" : "Use /policy in Telegram", state.policyActive ? "good" : "warn")}
+        ${analyticsCard("Policy", policyTitle(), state.policyActive ? policyDetail() : "Use /policy in Telegram", state.policyActive ? "good" : "warn")}
         ${analyticsCard("Signals", String(alerts), `${realSignals} real Mantle transaction${realSignals === 1 ? "" : "s"}`, alerts ? "danger" : "neutral")}
       </section>
 
@@ -138,4 +138,15 @@ function aiLabel(): string {
   if (state.aiProvider === "groq") return "Groq enhanced";
   if (state.aiProvider === "ollama") return "Ollama local";
   return state.aiProvider;
+}
+
+function policyTitle(): string {
+  if (!state.policyActive || !state.policy) return "Not set";
+  if (state.thresholdMnt <= 0) return "Any MNT outflow";
+  return `>${state.thresholdMnt} MNT`;
+}
+
+function policyDetail(): string {
+  if (!state.policy) return "Policy active";
+  return state.policy.rawText || (state.policy.escalateNewRecipient ? "Escalate new recipients" : "Threshold-only outflow rule");
 }

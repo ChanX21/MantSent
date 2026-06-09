@@ -16,7 +16,7 @@ export function alertCard(): string {
       <p>Large outflow to a first-seen recipient may indicate an unauthorized payout or compromised signer action.</p>
       <div class="alert-facts">
         <span>Recipient ${recipient}</span>
-        <span>Policy >${state.thresholdMnt} MNT + new recipient</span>
+        <span>Policy ${state.thresholdMnt <= 0 ? "any MNT outflow" : `>${state.thresholdMnt} MNT`}</span>
         <span>Evidence ${short(evidence)}</span>
       </div>
     </div>

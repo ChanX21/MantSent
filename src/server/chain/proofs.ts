@@ -32,7 +32,8 @@ export async function commitPolicyProof(env: RuntimeEnv, state: AppState): Promi
     watchedWallet,
     thresholdMnt: state.thresholdMnt,
     asset: "MNT",
-    escalation: "new-recipient",
+    escalation: state.policy?.escalateNewRecipient ? "new-recipient" : "threshold-only",
+    rawText: state.policy?.rawText || "",
   });
 
   const tx = await contract.getFunction("commitPolicy")(BigInt(state.agentId), policyHash, watchedWallet, {

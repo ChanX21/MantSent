@@ -8,6 +8,7 @@ var state = {
   resolved: false,
   outcome: "Unresolved",
   thresholdMnt: 10,
+  policy: null,
   aiProvider: "template",
   openAiConfigured: false,
   agentRegistrationTxHash: "",
@@ -40,6 +41,7 @@ function applyRemoteState(remote) {
     resolved: remote.resolved,
     outcome: remote.outcome,
     thresholdMnt: remote.thresholdMnt,
+    policy: remote.policy,
     aiProvider: remote.aiProvider,
     openAiConfigured: remote.openAiConfigured,
     agentRegistrationTxHash: remote.agentRegistrationTxHash,
@@ -97,7 +99,7 @@ function alertCard() {
       <p>Large outflow to a first-seen recipient may indicate an unauthorized payout or compromised signer action.</p>
       <div class="alert-facts">
         <span>Recipient ${recipient}</span>
-        <span>Policy >${state.thresholdMnt} MNT + new recipient</span>
+        <span>Policy ${state.thresholdMnt <= 0 ? "any MNT outflow" : `>${state.thresholdMnt} MNT`}</span>
         <span>Evidence ${short(evidence)}</span>
       </div>
     </div>
@@ -215,7 +217,7 @@ function analyticsDashboardView() {
       <section class="kpi-grid" aria-label="MantSent analytics summary">
         ${analyticsCard("Monitoring", state.monitorActive ? "Live" : "Off", state.monitorActive ? "Polling Mantle for wallet outflows" : "Start monitoring from Telegram", state.monitorActive ? "good" : "warn")}
         ${analyticsCard("Watched wallet", agent.wallet ? short(agent.wallet) : "Not set", agent.wallet ? "Single-wallet scope is configured" : "Use /watch in Telegram", agent.wallet ? "good" : "warn")}
-        ${analyticsCard("Policy", state.policyActive ? `>${state.thresholdMnt} MNT` : "Not set", state.policyActive ? "New-recipient outflow rule is active" : "Use /policy in Telegram", state.policyActive ? "good" : "warn")}
+        ${analyticsCard("Policy", policyTitle(), state.policyActive ? policyDetail() : "Use /policy in Telegram", state.policyActive ? "good" : "warn")}
         ${analyticsCard("Signals", String(alerts), `${realSignals} real Mantle transaction${realSignals === 1 ? "" : "s"}`, alerts ? "danger" : "neutral")}
       </section>
 
@@ -336,6 +338,15 @@ function aiLabel() {
   if (state.aiProvider === "groq") return "Groq enhanced";
   if (state.aiProvider === "ollama") return "Ollama local";
   return state.aiProvider;
+}
+function policyTitle() {
+  if (!state.policyActive || !state.policy) return "Not set";
+  if (state.thresholdMnt <= 0) return "Any MNT outflow";
+  return `>${state.thresholdMnt} MNT`;
+}
+function policyDetail() {
+  if (!state.policy) return "Policy active";
+  return state.policy.rawText || (state.policy.escalateNewRecipient ? "Escalate new recipients" : "Threshold-only outflow rule");
 }
 
 // src/shared/branding.ts

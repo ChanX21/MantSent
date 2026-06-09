@@ -9,6 +9,7 @@ export interface ClientState {
   resolved: boolean;
   outcome: PublicState["outcome"];
   thresholdMnt: number;
+  policy: PublicState["policy"];
   aiProvider: PublicState["aiProvider"];
   openAiConfigured: boolean;
   agentRegistrationTxHash: string;
