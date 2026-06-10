@@ -34,6 +34,7 @@ const defaultState: AppState = {
   seenRecipients: [],
   recentTransactions: [],
   lastFrequencyAlertAt: 0,
+  feedbackExamples: [],
   chatIds: [],
   incidents: [],
 };
@@ -47,6 +48,7 @@ export function loadState(path = statePath): AppState {
   loaded.openAiConfigured ||= false;
   loaded.recentTransactions ||= [];
   loaded.lastFrequencyAlertAt ||= 0;
+  loaded.feedbackExamples ||= [];
   sanitizeLegacyDemoState(loaded);
   loaded.incidents = loaded.incidents.map((incident) => ({
     ...incident,
@@ -57,6 +59,7 @@ export function loadState(path = statePath): AppState {
     recipient: incident.recipient || loaded.recipient,
     outflowAmountMnt: incident.outflowAmountMnt || "unknown",
     source: incident.source || loaded.evidenceSource,
+    reasonCodes: incident.reasonCodes || [],
   }));
   return loaded;
 }
@@ -89,6 +92,7 @@ function sanitizeLegacyDemoState(state: AppState): void {
     seenRecipients: [],
     recentTransactions: [],
     lastFrequencyAlertAt: 0,
+    feedbackExamples: [],
     incidents: [],
   });
 }

@@ -403,7 +403,7 @@ function commandsFor(demoMode: boolean): TelegramCommand[] {
     { command: "policy", description: "Commit an alert policy on Mantle" },
     { command: "monitor", description: "Enable live Mantle wallet monitoring" },
     { command: "openai", description: "Add an OpenAI key for richer explanations" },
-    { command: "groq", description: "Add a Groq key for hosted local-style explanations" },
+    { command: "groq", description: "Add a Groq key for richer explanations" },
     { command: "proof", description: "Show agent, policy, alert, and outcome proofs" },
     { command: "reset", description: "Reset this deployment state" },
   ];
@@ -556,11 +556,6 @@ function buttonsFor(state: PublicState, chainId?: string, demoMode = false): Inl
       { text: "Suspicious Activity", callback_data: "suspicious" },
     ],
   ];
-  const proofButtons: InlineButton[] = [];
-  if (state.policyTxHash) proofButtons.push({ text: "Policy Proof", url: mantleTxUrl(state.policyTxHash, chainId) });
-  if (state.alertTxHash) proofButtons.push({ text: "Alert Proof", url: mantleTxUrl(state.alertTxHash, chainId) });
-  if (state.outcomeTxHash) proofButtons.push({ text: "Outcome Proof", url: mantleTxUrl(state.outcomeTxHash, chainId) });
-  if (proofButtons.length) rows.push(proofButtons);
   rows.push(managementButtons());
   return rows;
 }

@@ -112,6 +112,7 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
     thresholdMnt: policy.thresholdMnt,
     recentTransactionCount: recentTransactions.length,
     direction,
+    feedbackExamples: state.feedbackExamples || [],
     llm,
   });
 

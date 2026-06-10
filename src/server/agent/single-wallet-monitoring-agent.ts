@@ -1,4 +1,4 @@
-import type { AgentProfile, AppState, EvidenceSource, Incident, MonitoringSkill, PolicyRule, RuntimeEnv } from "../../shared/types.js";
+import type { AgentProfile, AppState, EvidenceSource, FeedbackExample, Incident, MonitoringSkill, PolicyRule, RuntimeEnv } from "../../shared/types.js";
 import { normalizeAddress } from "../chain/mantle.js";
 import { evaluateTransfer, type PolicyDecision, type TransferCandidate } from "../policy/policy-engine.js";
 import { parsePolicy } from "../policy/policy-parser.js";
@@ -65,6 +65,7 @@ export async function buildIncident(input: {
   thresholdMnt: number;
   recentTransactionCount?: number;
   direction?: "incoming" | "outgoing";
+  feedbackExamples?: FeedbackExample[];
   llm: AgentLlmProvider;
 }): Promise<Incident> {
   const explanationInput = {
@@ -79,6 +80,7 @@ export async function buildIncident(input: {
     reasonCodes: input.decision.reasonCodes,
     recentTransactionCount: input.recentTransactionCount,
     direction: input.direction,
+    feedbackExamples: input.feedbackExamples?.slice(0, 5),
   };
 
   return {
@@ -92,5 +94,6 @@ export async function buildIncident(input: {
     source: input.source,
     explanation: await input.llm.explainAlert(explanationInput),
     explanationProvider: input.llm.id,
+    reasonCodes: input.decision.reasonCodes,
   };
 }

@@ -45,7 +45,19 @@ export interface Incident {
   source: EvidenceSource;
   explanation: string;
   explanationProvider: AiProvider;
+  reasonCodes?: string[];
   outcomeTxHash?: string;
+}
+
+export interface FeedbackExample {
+  outcome: OutcomeLabel;
+  policyText: string;
+  severity: Severity;
+  reasonCodes: string[];
+  amountMnt: string;
+  source: EvidenceSource;
+  recipient: string;
+  reviewedAt: string;
 }
 
 export type AiProvider = "template" | "openai" | "groq" | "ollama";
@@ -79,6 +91,7 @@ export interface AppState {
   seenRecipients: string[];
   recentTransactions: Array<{ hash: string; timestamp: number }>;
   lastFrequencyAlertAt: number;
+  feedbackExamples: FeedbackExample[];
   chatIds: number[];
   incidents: Incident[];
 }

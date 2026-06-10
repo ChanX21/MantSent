@@ -1,4 +1,4 @@
-import type { AiProvider, EvidenceSource, PolicyRule, RuntimeEnv } from "../../../shared/types.js";
+import type { AiProvider, EvidenceSource, FeedbackExample, PolicyRule, RuntimeEnv } from "../../../shared/types.js";
 
 export interface AlertExplanationInput {
   amountMnt: string;
@@ -12,6 +12,7 @@ export interface AlertExplanationInput {
   reasonCodes: string[];
   recentTransactionCount?: number;
   direction?: "incoming" | "outgoing";
+  feedbackExamples?: FeedbackExample[];
 }
 
 export interface AgentLlmProvider {
@@ -45,6 +46,7 @@ export function alertSystemPrompt(): string {
     "Use only supplied evidence. Do not guess hidden intent, counterparties, or contract purpose.",
     "Explain the exact compiled policy trigger in plain English, including burst windows or direction when present.",
     "Use the reasonCodes field as the source of why the alert fired.",
+    "Use feedbackExamples only as operator preference context; do not copy them or claim they prove the current alert.",
     "Do not mention implementation field names such as thresholdMnt, rawText, or reasonCodes.",
     "Do not use Markdown headings, bullets, asterisks, or decorative formatting.",
     "Say 'may indicate' and never assert theft or compromise as fact.",

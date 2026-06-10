@@ -206,6 +206,7 @@ async function simulateTransfer(env: RuntimeEnv, payload: ActionPayload): Promis
     policy,
     thresholdMnt: policy.thresholdMnt,
     direction: "outgoing",
+    feedbackExamples: current.feedbackExamples || [],
     llm,
   });
 
@@ -232,6 +233,17 @@ async function resolveAlert(env: RuntimeEnv, action: "expected" | "suspicious"):
     if (state.incidents[0]) {
       state.incidents[0].outcome = label;
       state.incidents[0].outcomeTxHash = proof.txHash;
+      state.feedbackExamples.unshift({
+        outcome: label,
+        policyText: state.policy?.rawText || "",
+        severity: state.incidents[0].severity,
+        reasonCodes: state.incidents[0].reasonCodes || [],
+        amountMnt: state.incidents[0].outflowAmountMnt,
+        source: state.incidents[0].source,
+        recipient: state.incidents[0].recipient,
+        reviewedAt: new Date().toISOString(),
+      });
+      state.feedbackExamples = state.feedbackExamples.slice(0, 25);
     }
   });
 }
@@ -260,6 +272,7 @@ function resetDemo(env: RuntimeEnv): AppState {
       seenRecipients: [],
       recentTransactions: [],
       lastFrequencyAlertAt: 0,
+      feedbackExamples: [],
       incidents: [],
       agentId,
       agentUri: env.MANTSENT_AGENT_URI || state.agentUri || defaultAgentUri(env),
