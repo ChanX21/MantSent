@@ -447,7 +447,9 @@ Scope: ${state.policyActive ? escapeHtml(policyScope(state)) : "Not set"}
 Monitor: ${state.monitorActive ? "Live" : "Off"}${latest ? `
 
 <b>Latest signal</b>
-${escapeHtml(latest.severity)} · ${escapeHtml(latest.outflowAmountMnt)} MNT · ${escapeHtml(latest.outcome)}
+${escapeHtml(latest.signalType || "Policy Match")} · ${escapeHtml(signalSeverityLabel(latest.signalSeverity, latest.severity))} · ${escapeHtml(latest.outcome)}
+Score: ${latest.signalScore ?? "Pending"}/100 · Relevance: ${escapeHtml(latest.investorRelevance || "pending")}
+Amount: ${escapeHtml(latest.outflowAmountMnt)} MNT
 Evidence: ${state.evidenceSource === "mantle-transaction" ? "Confirmed Mantle transaction" : "Non-live/demo evidence"}
 
 <b>Agent explanation</b>
@@ -493,6 +495,10 @@ function aiLabel(state: PublicState): string {
   if (state.aiProvider === "groq" && state.openAiConfigured) return "Groq";
   if (state.aiProvider === "ollama" && state.openAiConfigured) return "Ollama";
   return escapeHtml(state.aiProvider);
+}
+
+function signalSeverityLabel(signalSeverity: string | undefined, fallback: string): string {
+  return signalSeverity ? signalSeverity.toUpperCase() : fallback;
 }
 
 function escapeHtml(value: string): string {

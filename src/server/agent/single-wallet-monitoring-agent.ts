@@ -1,7 +1,8 @@
-import type { AgentProfile, AppState, EvidenceSource, FeedbackExample, Incident, MonitoringSkill, PolicyRule, RuntimeEnv } from "../../shared/types.js";
+import type { AgentProfile, AppState, EvidenceSource, FeedbackExample, Incident, MantleSignalSource, MantleSignalType, MonitoringSkill, PolicyRule, RuntimeEnv } from "../../shared/types.js";
 import { normalizeAddress } from "../chain/mantle.js";
 import { evaluateTransfer, type PolicyDecision, type TransferCandidate } from "../policy/policy-engine.js";
 import { parsePolicy } from "../policy/policy-parser.js";
+import { scoreMantleSignal } from "../signals/signal-scoring.js";
 import type { AgentLlmProvider } from "./llm/agent-llm-provider.js";
 
 export const singleWalletMonitoringSkill: MonitoringSkill = {
@@ -68,6 +69,19 @@ export async function buildIncident(input: {
   feedbackExamples?: FeedbackExample[];
   llm: AgentLlmProvider;
 }): Promise<Incident> {
+  const source = signalSourceFor(input);
+  const signalType = signalTypeFor(input, source);
+  const score = scoreMantleSignal({
+    source,
+    direction: input.direction ?? input.policy.direction ?? "outgoing",
+    amountFormatted: Number(input.outflowAmountMnt),
+    thresholdAmount: input.thresholdMnt,
+    isNewCounterparty: input.decision.recipientFirstSeen,
+    walletCategory: "custom",
+    walletImportance: "medium",
+    isBurstWindow: source === "burst_window",
+    reasonCodes: input.decision.reasonCodes,
+  });
   const explanationInput = {
     amountMnt: input.outflowAmountMnt,
     recipient: input.recipient,
@@ -87,6 +101,12 @@ export async function buildIncident(input: {
     evidenceTxHash: input.evidenceTxHash,
     alertTxHash: input.alertTxHash,
     severity: input.decision.severity,
+    signalType,
+    signalSource: source,
+    signalScore: score.score,
+    signalSeverity: score.severity,
+    signalConfidence: score.confidence,
+    investorRelevance: score.investorRelevance,
     outcome: "Unresolved",
     createdAt: new Date().toISOString(),
     recipient: input.recipient,
@@ -96,4 +116,30 @@ export async function buildIncident(input: {
     explanationProvider: input.llm.id,
     reasonCodes: input.decision.reasonCodes,
   };
+}
+
+function signalSourceFor(input: {
+  decision: PolicyDecision;
+  outflowAmountMnt: string;
+}): MantleSignalSource {
+  if (input.decision.reasonCodes.includes("TRANSACTION_FREQUENCY")) return "burst_window";
+  if (Number(input.outflowAmountMnt) === 0) return "zero_value_call";
+  return "native_tx";
+}
+
+function signalTypeFor(
+  input: {
+    decision: PolicyDecision;
+    direction?: "incoming" | "outgoing";
+    outflowAmountMnt: string;
+    thresholdMnt: number;
+  },
+  source: MantleSignalSource,
+): MantleSignalType {
+  if (source === "burst_window") return "Treasury Burst";
+  if (source === "zero_value_call") return "Zero-Value Activity Burst";
+  if (input.decision.recipientFirstSeen) return "New Counterparty";
+  if ((input.direction ?? "outgoing") === "incoming") return "Fresh Wallet Funding";
+  if (Number(input.outflowAmountMnt) >= input.thresholdMnt && input.thresholdMnt > 0) return "Large Native Outflow";
+  return "Policy Match";
 }

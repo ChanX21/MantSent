@@ -90,14 +90,18 @@ function alertCard() {
   const amount = latest?.outflowAmountMnt || "Unknown";
   const recipient = latest?.recipient || agent.recipient || "Pending";
   const evidence = latest?.evidenceTxHash || agent.tx;
+  const score = latest?.signalScore ?? 0;
+  const signalType = latest?.signalType || "Policy Match";
+  const severity = latest?.signalSeverity ? latest.signalSeverity.toUpperCase() : latest?.severity || "HIGH";
   return `
     <div class="alert-card">
       <div class="alert-top">
-        <span>CRITICAL MANTLE TREASURY ALERT</span>
-        <strong>${amount} MNT</strong>
+        <span>${signalType}</span>
+        <strong>${score}/100</strong>
       </div>
-      <p>Large outflow to a first-seen recipient may indicate an unauthorized payout or compromised signer action.</p>
+      <p>${severity} signal generated from the configured wallet policy and confirmed Mantle activity.</p>
       <div class="alert-facts">
+        <span>Amount ${amount} MNT</span>
         <span>Recipient ${recipient}</span>
         <span>Policy ${state.policy?.transactionCountThreshold ? `${state.policy.transactionCountThreshold}+ tx burst` : state.policy?.triggerOnAnyTransaction ? "any outgoing transaction" : state.thresholdMnt <= 0 ? "any MNT outflow" : `>${state.thresholdMnt} MNT`}</span>
         <span>Evidence ${short(evidence)}</span>
@@ -168,7 +172,8 @@ function signalTable(incidents) {
   return `
     <div class="signal-table">
       <div class="signal-row head">
-        <span>Severity</span>
+        <span>Signal</span>
+        <span>Score</span>
         <span>Outcome</span>
         <span>Amount</span>
         <span>Evidence</span>
@@ -176,7 +181,8 @@ function signalTable(incidents) {
       ${incidents.map(
     (incident) => `
             <div class="signal-row">
-              <strong>${incident.severity}</strong>
+              <strong>${incident.signalType || incident.severity}</strong>
+              <span>${incident.signalScore ?? "Pending"}</span>
               <span>${incident.outcome}</span>
               <span>${incident.outflowAmountMnt} MNT</span>
               <code>${short(incident.evidenceTxHash)}</code>

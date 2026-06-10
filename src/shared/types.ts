@@ -6,6 +6,24 @@ export type EvidenceSource = "demo" | "mantle-transaction";
 
 export type AgentIdentityStatus = "placeholder" | "erc8004-registered";
 
+export type MantleSignalSource = "native_tx" | "erc20_transfer" | "burst_window" | "zero_value_call";
+
+export type MantleSignalSeverity = "low" | "medium" | "high" | "critical";
+
+export type MantleSignalType =
+  | "Large Native Outflow"
+  | "Large ERC-20 Outflow"
+  | "New Counterparty"
+  | "Treasury Burst"
+  | "Fresh Wallet Funding"
+  | "Watchlist Interaction"
+  | "Zero-Value Activity Burst"
+  | "Policy Match";
+
+export type SignalConfidence = "low" | "medium" | "high";
+
+export type InvestorRelevance = "low" | "medium" | "high";
+
 export interface PolicyRule {
   asset: "MNT";
   thresholdMnt: number;
@@ -38,6 +56,12 @@ export interface Incident {
   evidenceTxHash: string;
   alertTxHash: string;
   severity: Severity;
+  signalType?: MantleSignalType;
+  signalSource?: MantleSignalSource;
+  signalScore?: number;
+  signalSeverity?: MantleSignalSeverity;
+  signalConfidence?: SignalConfidence;
+  investorRelevance?: InvestorRelevance;
   outcome: OutcomeLabel;
   createdAt: string;
   recipient: string;
