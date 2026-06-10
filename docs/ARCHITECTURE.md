@@ -14,7 +14,7 @@ It is used to write:
 - `AlertCommitted`
 - `OutcomeRecorded`
 
-The current agent profile is still a local demo profile until ERC-8004 Identity Registry registration is implemented. The UI and Telegram now expose this as `Demo profile` instead of implying that ERC-8004 registration already happened.
+The app supports a local agent profile and ERC-8004 Identity Registry registration. Telegram and the dashboard distinguish `Local profile` from `ERC-8004 registered`.
 
 ## Runtime Boundaries
 
@@ -25,7 +25,7 @@ The current agent profile is still a local demo profile until ERC-8004 Identity 
 | Monitoring agent | `src/server/agent/single-wallet-monitoring-agent.ts` | Defines the one-wallet monitoring skill, agent profile, transfer evaluation entrypoint, and alert explanation builder. |
 | Policy parsing | `src/server/policy/policy-parser.ts` | Converts user text into a deterministic `PolicyRule`. |
 | Policy enforcement | `src/server/policy/policy-engine.ts` | Evaluates transfers against the active rule and recipient history. |
-| Mantle monitor | `src/server/monitor/mantle-monitor.ts` | Polls confirmed blocks for native MNT outflows from the watched wallet. |
+| Mantle monitor | `src/server/monitor/mantle-monitor.ts` | Polls confirmed blocks for native MNT transfers and ERC-20 Transfer logs involving the watched wallet. |
 | Chain proof writer | `src/server/chain/proofs.ts` | Writes policy, alert, and outcome events to the ledger. |
 | Chain primitives | `src/server/chain/mantle.ts` | Provider, signer, ledger ABI, address/hash helpers. |
 | Telegram adapter | `src/server/telegram/telegram-service.ts` | Commands, inline buttons, branded status, proof links. |
@@ -50,12 +50,13 @@ The monitor:
 1. Loads active state from `data/mantsent-state.json`.
 2. Requires a watched wallet and committed policy.
 3. Polls confirmed Mantle blocks with a small bounded window.
-4. Filters native MNT transactions where `tx.from` is the watched wallet.
-5. Evaluates the transfer with `policy-engine.ts`.
-6. Writes `AlertCommitted` only when the active policy is breached.
-7. Stores the block cursor and incident so duplicate processing is avoided.
+4. Filters native MNT transactions where the watched wallet is sender or receiver.
+5. Scans ERC-20 `Transfer(address,address,uint256)` logs where the watched wallet is sender or receiver.
+6. Evaluates the movement with `policy-engine.ts`.
+7. Writes `AlertCommitted` only when the active policy is breached.
+8. Stores the block cursor and incident so duplicate processing is avoided.
 
-Current monitor scope is native MNT only. ERC-20 transfers need log scanning as a separate module.
+Current monitor scope is native MNT and ERC-20 Transfer logs. It does not yet parse swaps, bridges, failed transactions, NFT transfers, or protocol-specific events.
 
 ## Agent Skill
 
@@ -65,7 +66,7 @@ The first production skill is intentionally narrow:
 single-wallet-mnt-outflow-monitor
 ```
 
-It owns one watched Mantle address and evaluates native MNT outflows against one active policy. The agent module does not send Telegram messages or render UI. It provides:
+It owns one watched Mantle address and evaluates native MNT movement plus ERC-20 Transfer logs against one active policy. The agent module does not send Telegram messages or render UI. It provides:
 
 - the agent profile shown to users
 - the monitoring skill metadata
@@ -94,14 +95,19 @@ The provider lives under `src/server/agent/llm/`. It must not decide whether an 
 
 Policy enforcement is deterministic. The parser extracts:
 
-- asset: `MNT`
-- threshold: e.g. `10`
-- escalation: new or first-seen recipient language
+- asset: `MNT`, `ERC20`, or `ANY`
+- token symbol where specified, e.g. `USDC`, `USDT`, `WMNT`, `FBTC`
+- threshold: e.g. `10 MNT` or `1000 USDC`
+- direction: incoming, outgoing, or both
+- frequency windows: e.g. more than 2 transactions in 5 minutes
+- escalation: new or first-seen counterparty language
 
-The engine raises an alert only when:
+The engine raises an alert only when the compiled deterministic rule is breached. Examples:
 
 ```text
 outflowAmountMnt > policy.thresholdMnt
+tokenAmount > policy.thresholdToken
+recentTransactionCount >= policy.transactionCountThreshold
 ```
 
 Severity is `CRITICAL` when the threshold is breached and the recipient is first-seen under a policy that escalates new recipients. Otherwise threshold breaches are `HIGH`.
@@ -118,8 +124,8 @@ Only ledger transaction hashes should link to Mantle explorer unless the evidenc
 
 ## Next Production Steps
 
-1. Implement ERC-8004 Identity Registry registration and store the real `agentId`.
-2. Replace local JSON state with Postgres/Supabase.
-3. Add ERC-20 `Transfer` log monitoring.
-4. Add monitor health telemetry and admin reset tooling.
-5. Add tests around policy parsing, policy evaluation, and monitor idempotency.
+1. Replace local JSON state with Postgres/Supabase for multi-user operation.
+2. Add monitor health telemetry, retry accounting, and admin reset tooling.
+3. Add receipt-level semantic indexing for swaps, bridges, failed transactions, and gas anomalies.
+4. Add protocol/entity labels beyond the current operator-provided wallet profile.
+5. Add tests around monitor idempotency and ERC-20 log processing with recorded Mantle fixtures.

@@ -1,6 +1,6 @@
 # MantSent
 
-MantSent is a Mantle-native treasury anomaly interface: Telegram is the primary operator surface, while the website is an analytics dashboard for agent identity, AI mode, wallet monitoring, incidents, and proof receipts.
+MantSent is a Mantle-native wallet intelligence agent. Telegram is the primary operator surface for agent setup, wallet policy, monitoring, and human outcome labels. The website is a read-only analytics dashboard for signal quality, Mantle data coverage, incident history, and proof posture.
 
 ## Run
 
@@ -93,11 +93,13 @@ Then message the bot configured by `TELEGRAM_BOT_TOKEN`:
 /openai sk-... gpt-4.1-mini
 /watch 0xYourMantleWallet
 /policy Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.
+/label Treasury Ops | treasury | high
 /monitor
+/brief
 /proof
 ```
 
-Inline buttons are available for setup, ERC-8004 registration, hosted AI setup guidance, wallet changes, and proof links. `/simulate` is intentionally demo-only; live alerts come from the Mantle monitor after `/watch`, `/policy`, and `/monitor`.
+Inline buttons are available for setup, ERC-8004 registration, hosted AI setup guidance, wallet changes, and outcome labels. `/brief` returns an investor/operator risk snapshot. `/simulate` is intentionally demo-only; live alerts come from the Mantle monitor after `/watch`, `/policy`, and `/monitor`.
 
 Demo shortcuts are disabled by default. To expose `/demo` and demo wallet buttons in a non-production environment, set:
 
@@ -111,10 +113,20 @@ MANTSENT_ENABLE_DEMO_MODE=true
 2. Register the agent through the configured ERC-8004 Identity Registry.
 3. Optionally add a Groq or OpenAI API key for richer alert explanations.
 4. Watch one real Mantle wallet.
-5. Commit a policy for MNT outflows greater than the threshold to first-seen recipients.
+5. Commit a policy for native MNT movement, ERC-20 transfers, burst activity, new counterparties, or any matching wallet transaction.
 6. Enable live Mantle monitoring.
 7. Resolve matching alerts as expected or suspicious in Telegram.
-8. Use the website to inspect analytics, incident history, agent posture, and proof receipts.
+8. Use the website to inspect alpha score, source coverage, signal taxonomy, incident history, and agent posture.
+
+## Mantle Data Coverage
+
+The live monitor polls confirmed Mantle blocks and evaluates:
+
+- Native MNT transactions involving the watched wallet.
+- ERC-20 `Transfer(address,address,uint256)` logs involving the watched wallet.
+- Frequency windows, threshold policies, direction policies, and new-counterparty escalation.
+
+Every policy match can commit an `AlertCommitted` proof to the Mantle Signal Ledger. Operator outcomes can commit `OutcomeRecorded` and are retained as local feedback examples for future agent explanations.
 
 ## Project Map
 
@@ -125,6 +137,7 @@ The code is split by operational responsibility so a future change can be assign
 | Server composition | `src/server/main.ts` | Starts HTTP, Telegram polling, env bootstrap, and dependency wiring. |
 | Product actions | `src/server/actions/action-service.ts` | Create/watch/policy/alert/outcome/reset workflows. |
 | Mantle proofs | `src/server/chain/proofs.ts`, `src/server/chain/mantle.ts` | Ledger contract calls, hashing, address normalization, provider/signer setup. |
+| Mantle monitor | `src/server/monitor/mantle-monitor.ts` | Confirmed block polling for native transactions and ERC-20 Transfer logs. |
 | Telegram adapter | `src/server/telegram/telegram-service.ts` | Commands, inline buttons, polling, and Telegram API calls. |
 | HTTP adapter | `src/server/http/request-handler.ts` | `/api/state`, `/api/action`, webhook route, static file serving. |
 | Persistence | `src/server/state/store.ts` | Local JSON state and public state projection. |
@@ -137,6 +150,14 @@ Debug from the boundary first: frontend issues start at `src/client/api.ts`; Tel
 
 For the fuller engineering map, see `docs/ARCHITECTURE.md`.
 
+## Judging Positioning
+
+For the Mantle general criteria, MantSent demonstrates a real Mantle Sepolia contract, deterministic monitoring, ERC-8004 agent registration flow, Telegram operator UX, and a Mantle-themed analytics interface.
+
+For the Mirana Alpha & Data track, MantSent is positioned as wallet-risk and alpha-signal infrastructure: it turns native and ERC-20 wallet movement into scored, explainable, auditable signals that a sophisticated investor can use to monitor treasury, whale, protocol, or exchange wallets.
+
+See `docs/JUDGING.md` for the scorecard mapping and demo script.
+
 ## Guardrails
 
-MantSent reports policy-based anomaly signals. It does not claim theft detection, custody protection, or trading advice. The UI uses operator-confirmed outcomes as verified performance data.
+MantSent reports policy-based anomaly signals. It does not claim theft detection, custody protection, guaranteed alpha, or trading advice. The UI uses operator-confirmed outcomes as feedback data, not as proof of model accuracy.
