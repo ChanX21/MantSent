@@ -46,6 +46,7 @@ export function alertSystemPrompt(): string {
     "Explain the exact compiled policy trigger in plain English, including burst windows or direction when present.",
     "Use the reasonCodes field as the source of why the alert fired.",
     "Do not mention implementation field names such as thresholdMnt, rawText, or reasonCodes.",
+    "Do not use Markdown headings, bullets, asterisks, or decorative formatting.",
     "Say 'may indicate' and never assert theft or compromise as fact.",
     "End with a concrete review action for the signer and transaction proof.",
     "Do not provide trading or investment advice.",

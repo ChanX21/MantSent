@@ -451,7 +451,7 @@ ${escapeHtml(latest.severity)} · ${escapeHtml(latest.outflowAmountMnt)} MNT · 
 Evidence: ${state.evidenceSource === "mantle-transaction" ? "Confirmed Mantle transaction" : "Non-live/demo evidence"}
 
 <b>Agent explanation</b>
-${escapeHtml(latest.explanation)}` : ""}
+${formatTelegramExplanation(latest.explanation)}` : ""}
 ${proofs ? `
 <b>Proofs</b>
 ${proofs}` : ""}`;
@@ -497,6 +497,14 @@ function aiLabel(state: PublicState): string {
 
 function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function formatTelegramExplanation(value: string): string {
+  const escaped = escapeHtml(value);
+  return escaped
+    .replace(/\*\*([^*\n][^*]*?)\*\*/g, "<b>$1</b>")
+    .replace(/__([^_\n][^_]*?)__/g, "<b>$1</b>")
+    .replace(/\n{3,}/g, "\n\n");
 }
 
 function buttonsFor(state: PublicState, chainId?: string, demoMode = false): InlineKeyboard {
