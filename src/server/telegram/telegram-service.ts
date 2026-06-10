@@ -614,24 +614,21 @@ function buttonsFor(state: PublicState, chainId?: string, demoMode = false): Inl
   if (!state.agentCreated) {
     return [
       [{ text: "Deploy & Register Agent", callback_data: "deploy_agent" }],
-      [{ text: "Create Local Agent", callback_data: "create" }],
     ];
   }
   if (state.agentIdentityStatus !== "erc8004-registered") {
     return [
       [{ text: "Register ERC-8004 Agent", callback_data: "register_agent" }],
-      [{ text: "Set Real Wallet", callback_data: "wallet_setup" }],
       [{ text: "Add AI Key", callback_data: "ai_setup" }],
       managementButtons(),
     ];
   }
   if (!state.walletWatched) {
     const rows: InlineKeyboard = [
-      [{ text: "Set Real Wallet", callback_data: "wallet_setup" }],
       [{ text: "Add AI Key", callback_data: "ai_setup" }],
       managementButtons(),
     ];
-    if (demoMode) rows.splice(2, 0, [{ text: "Use Demo Wallet", callback_data: "watch_demo" }]);
+    if (demoMode) rows.splice(1, 0, [{ text: "Use Demo Wallet", callback_data: "watch_demo" }]);
     return rows;
   }
   if (!state.policyActive) {
