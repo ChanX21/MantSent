@@ -33,6 +33,7 @@ const defaultState: AppState = {
   monitorCursorBlock: 0,
   seenRecipients: [],
   recentTransactions: [],
+  lastFrequencyAlertAt: 0,
   chatIds: [],
   incidents: [],
 };
@@ -45,6 +46,7 @@ export function loadState(path = statePath): AppState {
   loaded.aiProvider ||= "template";
   loaded.openAiConfigured ||= false;
   loaded.recentTransactions ||= [];
+  loaded.lastFrequencyAlertAt ||= 0;
   sanitizeLegacyDemoState(loaded);
   loaded.incidents = loaded.incidents.map((incident) => ({
     ...incident,
@@ -86,6 +88,7 @@ function sanitizeLegacyDemoState(state: AppState): void {
     monitorCursorBlock: 0,
     seenRecipients: [],
     recentTransactions: [],
+    lastFrequencyAlertAt: 0,
     incidents: [],
   });
 }

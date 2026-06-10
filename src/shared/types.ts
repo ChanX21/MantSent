@@ -78,6 +78,7 @@ export interface AppState {
   monitorCursorBlock: number;
   seenRecipients: string[];
   recentTransactions: Array<{ hash: string; timestamp: number }>;
+  lastFrequencyAlertAt: number;
   chatIds: number[];
   incidents: Incident[];
 }

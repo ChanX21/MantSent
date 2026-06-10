@@ -85,6 +85,8 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
   });
 
   if (!decision.shouldAlert) return;
+  const frequencyWindow = policy.transactionWindowSeconds || 300;
+  if (decision.reasonCodes.includes("TRANSACTION_FREQUENCY") && state.lastFrequencyAlertAt && timestamp - state.lastFrequencyAlertAt < frequencyWindow) return;
 
   const prepared = mutateState((current) => {
     current.evidenceTxHash = tx.hash;
@@ -119,6 +121,7 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
     current.outcome = "Unresolved";
     current.alertTxHash = proof.txHash;
     current.lastAlertHash = proof.alertHash || "";
+    if (decision.reasonCodes.includes("TRANSACTION_FREQUENCY")) current.lastFrequencyAlertAt = timestamp;
     current.incidents.unshift(incident);
   });
   await onIncident?.(incident);
