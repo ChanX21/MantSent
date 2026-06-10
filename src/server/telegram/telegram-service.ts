@@ -10,12 +10,21 @@ import { defaultMantleLogoUrl, defaultTelegramImagePath, mantleProofTagline, tel
 const demoWallet = "0x7f2c2fbb1d2e4b6e6f8e45b902399d8a3c02a91e";
 const demoPolicy = "Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.";
 const setupText =
-  "<b>Set up live wallet monitoring</b>\n" +
+  "<b>Set up treasury monitoring</b>\n" +
   "1. <code>/deploy My Agent Name</code>\n" +
   "2. <code>/groq gsk-... llama-3.1-8b-instant</code> optional\n" +
   "3. <code>/watch 0xYourMantleWallet</code>\n" +
-  "4. <code>/policy Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.</code>\n" +
-  "5. <code>/monitor</code>";
+  "4. <code>/label Treasury Ops | treasury | high</code>\n" +
+  "5. <code>/policy Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.</code>\n" +
+  "6. <code>/monitor</code>";
+const samplePolicyText =
+  "<b>Sample policies</b>\n" +
+  "<code>/policy Alert me if any outgoing transaction happens</code>\n" +
+  "<code>/policy Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new</code>\n" +
+  "<code>/policy Alert me if more than 2 transactions happen in 5 minutes</code>\n" +
+  "<code>/policy Alert me if any USDC token transfer happens</code>\n" +
+  "<code>/policy Alert me if more than 1000 USDT leaves this wallet</code>\n\n" +
+  "Supported live sources: native MNT transactions and ERC-20 Transfer logs on Mantle.";
 const aiSetupText =
   "<b>Optional AI upgrade</b>\n" +
   "Send <code>/groq gsk-... llama-3.1-8b-instant</code> for Groq explanations, or <code>/openai sk-... gpt-4.1-mini</code> for OpenAI.\n\n" +
@@ -185,8 +194,11 @@ export function createTelegramService({
       } else if (!command?.startsWith("/") && looksLikePolicy(text) && actions.state().walletWatched) {
         await securePolicy(chatId, text.trim());
       } else if (command === "/create") {
-        await actions.run("create", { name: args || undefined });
-        await sendStatus(chatId);
+        await call("sendMessage", {
+          chat_id: chatId,
+          text: "<b>Use the real agent path.</b>\nRun <code>/deploy My Agent Name</code> to create and register an ERC-8004 agent on Mantle.",
+          parse_mode: "HTML",
+        });
       } else if (command === "/deploy") {
         await call("sendMessage", {
           chat_id: chatId,
@@ -236,6 +248,8 @@ export function createTelegramService({
           parse_mode: "HTML",
           disable_web_page_preview: true,
         });
+      } else if (command === "/policies") {
+        await call("sendMessage", { chat_id: chatId, text: samplePolicyText, parse_mode: "HTML" });
       } else if (command === "/brief") {
         await call("sendMessage", {
           chat_id: chatId,
@@ -292,7 +306,7 @@ export function createTelegramService({
         await actions.run("monitor", {});
         await call("sendMessage", {
           chat_id: chatId,
-          text: "<b>Mantle monitor enabled.</b>\nConfirmed native MNT outflows will be evaluated against the active wallet policy.",
+          text: "<b>Mantle monitor enabled.</b>\nConfirmed native MNT transactions and ERC-20 Transfer logs will be evaluated against the active policy.",
           parse_mode: "HTML",
         });
         await sendStatus(chatId);
@@ -310,7 +324,7 @@ export function createTelegramService({
         await call("sendMessage", {
           chat_id: chatId,
           text:
-            `<b>Commands</b>\n/deploy [agent name]\n/create [agent name]\n/register [agentURI]\n/groq gsk-... [model]\n/openai sk-... [model]\n/watch 0x...\n/watchlist\n/label Treasury Ops | treasury | high\n/policy alert me if more than 10 MNT leaves\n/monitor\n/brief\n/proof\n/reset\n/redeploy${demoMode ? "\n/demo" : ""}`,
+            `<b>Commands</b>\n/deploy [agent name]\n/register [agentURI]\n/groq gsk-... [model]\n/openai sk-... [model]\n/watch 0x...\n/watchlist\n/label Treasury Ops | treasury | high\n/policies\n/policy alert me if more than 10 MNT leaves\n/monitor\n/brief\n/proof\n/reset\n/redeploy${demoMode ? "\n/demo" : ""}`,
           parse_mode: "HTML",
         });
       }
@@ -416,7 +430,7 @@ function isAuthorizedChat(chatId: number, adminChats: Set<number>): boolean {
 }
 
 function isReadOnlyCommand(command?: string): boolean {
-  return !command || ["/start", "/proof", "/incidents", "/watchlist", "/brief", "/help"].includes(command);
+  return !command || ["/start", "/proof", "/incidents", "/watchlist", "/policies", "/brief", "/help"].includes(command);
 }
 
 function isReadOnlyCallback(action: string): boolean {
@@ -430,6 +444,7 @@ function commandsFor(demoMode: boolean): TelegramCommand[] {
     { command: "watch", description: "Set the Mantle wallet to monitor" },
     { command: "watchlist", description: "Show labelled wallet profile" },
     { command: "label", description: "Label the watched wallet for scoring" },
+    { command: "policies", description: "Show supported policy examples" },
     { command: "policy", description: "Commit an alert policy on Mantle" },
     { command: "monitor", description: "Enable live Mantle wallet monitoring" },
     { command: "brief", description: "Show current risk brief" },
@@ -577,9 +592,10 @@ function policySummary(state: PublicState): string {
 }
 
 function policyScope(state: PublicState): string {
+  const asset = state.policy?.asset === "ERC20" ? `${state.policy.tokenSymbol || "ERC-20"} Transfer logs` : state.policy?.asset === "ANY" ? "native MNT and ERC-20 transfers" : "native Mantle transactions";
   const direction = state.policy?.direction || "both";
   const zeroValue = state.policy?.includeZeroValue ? ", includes zero-value calls" : "";
-  return `${direction} native Mantle transactions${zeroValue}`;
+  return `${direction} ${asset}${zeroValue}`;
 }
 
 function aiLabel(state: PublicState): string {
