@@ -66,6 +66,9 @@ export async function buildIncident(input: {
   thresholdMnt: number;
   recentTransactionCount?: number;
   direction?: "incoming" | "outgoing";
+  walletCategory?: string;
+  walletImportance?: "low" | "medium" | "high";
+  hasWalletLabel?: boolean;
   feedbackExamples?: FeedbackExample[];
   llm: AgentLlmProvider;
 }): Promise<Incident> {
@@ -77,10 +80,11 @@ export async function buildIncident(input: {
     amountFormatted: Number(input.outflowAmountMnt),
     thresholdAmount: input.thresholdMnt,
     isNewCounterparty: input.decision.recipientFirstSeen,
-    walletCategory: "custom",
-    walletImportance: "medium",
+    walletCategory: input.walletCategory || "custom",
+    walletImportance: input.walletImportance || "medium",
     isBurstWindow: source === "burst_window",
     reasonCodes: input.decision.reasonCodes,
+    hasWalletLabel: input.hasWalletLabel,
   });
   const explanationInput = {
     amountMnt: input.outflowAmountMnt,

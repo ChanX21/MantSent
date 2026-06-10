@@ -10,6 +10,7 @@ export interface ClientState {
   outcome: PublicState["outcome"];
   thresholdMnt: number;
   policy: PublicState["policy"];
+  watchedWallets: PublicState["watchedWallets"];
   aiProvider: PublicState["aiProvider"];
   openAiConfigured: boolean;
   agentRegistrationTxHash: string;

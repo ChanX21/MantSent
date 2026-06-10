@@ -9,6 +9,7 @@ var state = {
   outcome: "Unresolved",
   thresholdMnt: 10,
   policy: null,
+  watchedWallets: [],
   aiProvider: "template",
   openAiConfigured: false,
   agentRegistrationTxHash: "",
@@ -42,6 +43,7 @@ function applyRemoteState(remote) {
     outcome: remote.outcome,
     thresholdMnt: remote.thresholdMnt,
     policy: remote.policy,
+    watchedWallets: remote.watchedWallets || [],
     aiProvider: remote.aiProvider,
     openAiConfigured: remote.openAiConfigured,
     agentRegistrationTxHash: remote.agentRegistrationTxHash,
@@ -218,11 +220,12 @@ function analyticsDashboardView() {
   const suspicious = state.incidents.filter((incident) => incident.outcome === "Suspicious Activity").length;
   const realSignals = state.incidents.filter((incident) => incident.source === "mantle-transaction").length;
   const latest = state.incidents[0];
+  const walletProfile = state.watchedWallets[0];
   return `
     <main id="dashboard" class="analytics-dashboard">
       <section class="kpi-grid" aria-label="MantSent analytics summary">
         ${analyticsCard("Monitoring", state.monitorActive ? "Live" : "Off", state.monitorActive ? "Polling Mantle for wallet outflows" : "Start monitoring from Telegram", state.monitorActive ? "good" : "warn")}
-        ${analyticsCard("Watched wallet", agent.wallet ? short(agent.wallet) : "Not set", agent.wallet ? "Single-wallet scope is configured" : "Use /watch in Telegram", agent.wallet ? "good" : "warn")}
+        ${analyticsCard("Watched wallet", walletProfile?.label || (agent.wallet ? short(agent.wallet) : "Not set"), walletProfile ? `${walletProfile.category} \xB7 ${walletProfile.importance} importance` : agent.wallet ? "Single-wallet scope is configured" : "Use /watch in Telegram", agent.wallet ? "good" : "warn")}
         ${analyticsCard("Policy", policyTitle(), state.policyActive ? policyDetail() : "Use /policy in Telegram", state.policyActive ? "good" : "warn")}
         ${analyticsCard("Signals", String(alerts), `${realSignals} real Mantle transaction${realSignals === 1 ? "" : "s"}`, alerts ? "danger" : "neutral")}
       </section>

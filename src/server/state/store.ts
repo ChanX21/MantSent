@@ -9,6 +9,7 @@ const defaultState: AppState = {
   agentCreated: false,
   agentIdentityStatus: "placeholder",
   walletWatched: false,
+  watchedWallets: [],
   policyActive: false,
   monitorActive: false,
   transferDetected: false,
@@ -49,6 +50,7 @@ export function loadState(path = statePath): AppState {
   loaded.recentTransactions ||= [];
   loaded.lastFrequencyAlertAt ||= 0;
   loaded.feedbackExamples ||= [];
+  loaded.watchedWallets ||= legacyWatchedWallets(loaded);
   sanitizeLegacyDemoState(loaded);
   loaded.incidents = loaded.incidents.map((incident) => ({
     ...incident,
@@ -76,6 +78,7 @@ function sanitizeLegacyDemoState(state: AppState): void {
     walletWatched: false,
     policyActive: false,
     monitorActive: false,
+    watchedWallets: [],
     transferDetected: false,
     resolved: false,
     outcome: "Unresolved",
@@ -95,6 +98,19 @@ function sanitizeLegacyDemoState(state: AppState): void {
     feedbackExamples: [],
     incidents: [],
   });
+}
+
+function legacyWatchedWallets(state: AppState): AppState["watchedWallets"] {
+  if (!state.watchedWallet) return [];
+  return [
+    {
+      address: state.watchedWallet,
+      label: "Primary Mantle Wallet",
+      category: "custom",
+      importance: "medium",
+      createdAt: new Date().toISOString(),
+    },
+  ];
 }
 
 export function saveState(state: AppState, path = statePath): void {

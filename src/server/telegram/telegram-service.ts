@@ -229,6 +229,27 @@ export function createTelegramService({
           parse_mode: "HTML",
         });
         await sendStatus(chatId);
+      } else if (command === "/watchlist") {
+        await call("sendMessage", {
+          chat_id: chatId,
+          text: watchlistText(actions.state()),
+          parse_mode: "HTML",
+          disable_web_page_preview: true,
+        });
+      } else if (command === "/label") {
+        if (!args) {
+          await call("sendMessage", {
+            chat_id: chatId,
+            text:
+              "<b>Label the watched wallet</b>\nUse <code>/label Treasury Ops | treasury | high</code>\nCategories: treasury, whale, protocol, exchange, fresh, custom\nImportance: low, medium, high",
+            parse_mode: "HTML",
+          });
+          return;
+        }
+        const profile = parseWalletProfileArgs(args);
+        await actions.run("watchlist", profile);
+        await call("sendMessage", { chat_id: chatId, text: "<b>Wallet profile updated.</b>\nFuture signals will use this label in scoring.", parse_mode: "HTML" });
+        await sendStatus(chatId);
       } else if (command === "/policy") {
         if (!args) {
           await promptForPolicy(chatId);
@@ -282,7 +303,7 @@ export function createTelegramService({
         await call("sendMessage", {
           chat_id: chatId,
           text:
-            `<b>Commands</b>\n/deploy [agent name]\n/create [agent name]\n/register [agentURI]\n/groq gsk-... [model]\n/openai sk-... [model]\n/watch 0x...\n/policy alert me if more than 10 MNT leaves\n/monitor\n/proof\n/reset\n/redeploy${demoMode ? "\n/demo" : ""}`,
+            `<b>Commands</b>\n/deploy [agent name]\n/create [agent name]\n/register [agentURI]\n/groq gsk-... [model]\n/openai sk-... [model]\n/watch 0x...\n/watchlist\n/label Treasury Ops | treasury | high\n/policy alert me if more than 10 MNT leaves\n/monitor\n/proof\n/reset\n/redeploy${demoMode ? "\n/demo" : ""}`,
           parse_mode: "HTML",
         });
       }
@@ -388,7 +409,7 @@ function isAuthorizedChat(chatId: number, adminChats: Set<number>): boolean {
 }
 
 function isReadOnlyCommand(command?: string): boolean {
-  return !command || ["/start", "/proof", "/incidents", "/help"].includes(command);
+  return !command || ["/start", "/proof", "/incidents", "/watchlist", "/help"].includes(command);
 }
 
 function isReadOnlyCallback(action: string): boolean {
@@ -400,6 +421,8 @@ function commandsFor(demoMode: boolean): TelegramCommand[] {
     { command: "start", description: "Open MantSent and show current setup" },
     { command: "deploy", description: "Create and register an ERC-8004 agent" },
     { command: "watch", description: "Set the Mantle wallet to monitor" },
+    { command: "watchlist", description: "Show labelled wallet profile" },
+    { command: "label", description: "Label the watched wallet for scoring" },
     { command: "policy", description: "Commit an alert policy on Mantle" },
     { command: "monitor", description: "Enable live Mantle wallet monitoring" },
     { command: "openai", description: "Add an OpenAI key for richer explanations" },
@@ -409,6 +432,39 @@ function commandsFor(demoMode: boolean): TelegramCommand[] {
   ];
   if (demoMode) commands.push({ command: "demo", description: "Run demo alert flow" });
   return commands;
+}
+
+function watchlistText(state: PublicState): string {
+  if (!state.watchedWallets.length) return "<b>Watchlist</b>\nNo wallet profile set. Use <code>/watch 0x...</code> first.";
+  const wallet = state.watchedWallets[0];
+  if (!wallet) return "<b>Watchlist</b>\nNo wallet profile set. Use <code>/watch 0x...</code> first.";
+  return `<b>Watchlist</b>
+<b>${escapeHtml(wallet.label)}</b>
+Address: <code>${escapeHtml(shortAddress(wallet.address))}</code>
+Category: ${escapeHtml(wallet.category)}
+Importance: ${escapeHtml(wallet.importance)}
+${wallet.notes ? `Notes: ${escapeHtml(wallet.notes)}` : "Notes: Not set"}`;
+}
+
+function parseWalletProfileArgs(args: string): { name: string; category: "treasury" | "whale" | "protocol" | "exchange" | "fresh" | "custom"; importance: "low" | "medium" | "high" } {
+  const [rawName, rawCategory, rawImportance] = args.split("|").map((part) => part.trim());
+  const category = parseCategory(rawCategory);
+  const importance = parseImportance(rawImportance);
+  return {
+    name: rawName || "Primary Mantle Wallet",
+    category,
+    importance,
+  };
+}
+
+function parseCategory(value?: string): "treasury" | "whale" | "protocol" | "exchange" | "fresh" | "custom" {
+  if (value === "treasury" || value === "whale" || value === "protocol" || value === "exchange" || value === "fresh" || value === "custom") return value;
+  return "custom";
+}
+
+function parseImportance(value?: string): "low" | "medium" | "high" {
+  if (value === "low" || value === "medium" || value === "high") return value;
+  return "medium";
 }
 
 function isWalletAddress(value: string): boolean {

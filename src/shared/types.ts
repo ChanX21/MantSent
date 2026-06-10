@@ -24,6 +24,19 @@ export type SignalConfidence = "low" | "medium" | "high";
 
 export type InvestorRelevance = "low" | "medium" | "high";
 
+export type WatchlistCategory = "treasury" | "whale" | "protocol" | "exchange" | "fresh" | "custom";
+
+export type WatchlistImportance = "low" | "medium" | "high";
+
+export interface WatchedWalletProfile {
+  address: string;
+  label: string;
+  category: WatchlistCategory;
+  importance: WatchlistImportance;
+  notes?: string;
+  createdAt: string;
+}
+
 export interface PolicyRule {
   asset: "MNT";
   thresholdMnt: number;
@@ -90,6 +103,7 @@ export interface AppState {
   agentCreated: boolean;
   agentIdentityStatus: AgentIdentityStatus;
   walletWatched: boolean;
+  watchedWallets: WatchedWalletProfile[];
   policyActive: boolean;
   monitorActive: boolean;
   transferDetected: boolean;
@@ -156,6 +170,7 @@ export type ActionName =
   | "deploy_agent"
   | "configure_ai"
   | "watch"
+  | "watchlist"
   | "policy"
   | "transfer"
   | "expected"
@@ -172,6 +187,8 @@ export interface ActionPayload {
   apiKey?: string;
   model?: string;
   agentUri?: string;
+  category?: WatchlistCategory;
+  importance?: WatchlistImportance;
   evidenceTxHash?: string;
   recipient?: string;
   force?: boolean;

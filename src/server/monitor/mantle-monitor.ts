@@ -63,6 +63,7 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
   if (tx.value <= 0n && !policy.includeZeroValue && !policy.triggerOnAnyTransaction && !policy.transactionCountThreshold) return;
   const amountMnt = Number(formatMnt(tx.value));
   const recipient = normalizeAddress(direction === "outgoing" ? tx.to : tx.from);
+  const watchedWalletProfile = state.watchedWallets.find((wallet) => wallet.address.toLowerCase() === state.watchedWallet.toLowerCase());
   const timestamp = Math.floor(Date.now() / 1000);
   const recentTransactions = recentTransactionsForPolicy(state.recentTransactions || [], tx.hash, timestamp, policy.transactionWindowSeconds);
   const decision = evaluateAgentTransfer(
@@ -112,6 +113,9 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
     thresholdMnt: policy.thresholdMnt,
     recentTransactionCount: recentTransactions.length,
     direction,
+    walletCategory: watchedWalletProfile?.category,
+    walletImportance: watchedWalletProfile?.importance,
+    hasWalletLabel: Boolean(watchedWalletProfile?.label),
     feedbackExamples: state.feedbackExamples || [],
     llm,
   });

@@ -1,4 +1,4 @@
-import type { ActionName, ActionPayload, AppState, OutcomeLabel, PublicState, RuntimeEnv } from "../../shared/types.js";
+import type { ActionName, ActionPayload, AppState, OutcomeLabel, PublicState, RuntimeEnv, WatchedWalletProfile } from "../../shared/types.js";
 import {
   activateMonitoringPolicy,
   assignSingleWallet,
@@ -29,6 +29,7 @@ export function createActionService(env: RuntimeEnv): ActionService {
       if (action === "deploy_agent") return deployAgent(env, payload);
       if (action === "configure_ai") return configureAi(env, payload);
       if (action === "watch") return watchWallet(payload);
+      if (action === "watchlist") return updateWatchlistProfile(payload);
       if (action === "policy") return activatePolicy(env, payload);
       if (action === "transfer") return simulateTransfer(env, payload);
       if (action === "expected" || action === "suspicious") return resolveAlert(env, action);
@@ -111,6 +112,16 @@ function watchWallet(payload: ActionPayload): AppState {
     state.agentCreated = true;
     state.walletWatched = true;
     state.watchedWallet = address;
+    state.watchedWallets = [
+      {
+        address,
+        label: payload.name || "Primary Mantle Wallet",
+        category: payload.category || "custom",
+        importance: payload.importance || "medium",
+        notes: payload.text && payload.text !== address ? payload.text : undefined,
+        createdAt: new Date().toISOString(),
+      },
+    ];
     state.recipient = "";
     state.policy = null;
     state.policyActive = false;
@@ -129,6 +140,22 @@ function watchWallet(payload: ActionPayload): AppState {
     state.recentTransactions = [];
     state.lastFrequencyAlertAt = 0;
     state.incidents = [];
+  });
+}
+
+function updateWatchlistProfile(payload: ActionPayload): AppState {
+  return mutateState((state) => {
+    if (!state.walletWatched || !state.watchedWallet) throw new Error("Set a Mantle wallet first with /watch 0x...");
+    const existing = currentWatchedWallet(state);
+    const profile: WatchedWalletProfile = {
+      address: state.watchedWallet,
+      label: payload.name || existing?.label || "Primary Mantle Wallet",
+      category: payload.category || existing?.category || "custom",
+      importance: payload.importance || existing?.importance || "medium",
+      notes: payload.text || existing?.notes,
+      createdAt: existing?.createdAt || new Date().toISOString(),
+    };
+    state.watchedWallets = [profile];
   });
 }
 
@@ -206,6 +233,9 @@ async function simulateTransfer(env: RuntimeEnv, payload: ActionPayload): Promis
     policy,
     thresholdMnt: policy.thresholdMnt,
     direction: "outgoing",
+    walletCategory: current.watchedWallets[0]?.category,
+    walletImportance: current.watchedWallets[0]?.importance,
+    hasWalletLabel: Boolean(current.watchedWallets[0]?.label),
     feedbackExamples: current.feedbackExamples || [],
     llm,
   });
@@ -259,6 +289,7 @@ function resetDemo(env: RuntimeEnv): AppState {
       resolved: false,
       outcome: "Unresolved",
       watchedWallet: "",
+      watchedWallets: [],
       recipient: "",
       policy: null,
       evidenceTxHash: "",
@@ -282,6 +313,10 @@ function resetDemo(env: RuntimeEnv): AppState {
       agentProfile: createAgentProfile(env, agentId),
     });
   });
+}
+
+function currentWatchedWallet(state: Pick<AppState, "watchedWallet" | "watchedWallets">): WatchedWalletProfile | undefined {
+  return state.watchedWallets.find((wallet) => wallet.address.toLowerCase() === state.watchedWallet.toLowerCase());
 }
 
 function enableMonitor(): AppState {
