@@ -11,6 +11,7 @@ import { registerAgentIdentity } from "../chain/erc8004.js";
 import { commitAlertProof, commitOutcomeProof, commitPolicyProof } from "../chain/proofs.js";
 import { updateEnvValue } from "../config/env.js";
 import { createAgentLlmProvider } from "../agent/llm/provider-factory.js";
+import { lookupEntityLabel } from "../entities/entity-labels.js";
 import { mutateState, publicState } from "../state/store.js";
 
 const demoRecipient = "0x48B981747384A90A24ad834DAd6AfaB6D1f0F0C2";
@@ -28,8 +29,8 @@ export function createActionService(env: RuntimeEnv): ActionService {
       if (action === "register_agent") return registerAgent(env, payload);
       if (action === "deploy_agent") return deployAgent(env, payload);
       if (action === "configure_ai") return configureAi(env, payload);
-      if (action === "watch") return watchWallet(payload);
-      if (action === "watch_add") return addWatchedWallet(payload);
+      if (action === "watch") return watchWallet(env, payload);
+      if (action === "watch_add") return addWatchedWallet(env, payload);
       if (action === "watch_remove") return removeWatchedWallet(payload);
       if (action === "watchlist") return updateWatchlistProfile(payload);
       if (action === "policy") return activatePolicy(env, payload);
@@ -108,20 +109,22 @@ function configureAi(env: RuntimeEnv, payload: ActionPayload): AppState {
   });
 }
 
-function walletProfileFromPayload(payload: ActionPayload, fallbackLabel = "Primary Mantle Wallet"): WatchedWalletProfile {
+function walletProfileFromPayload(env: RuntimeEnv, payload: ActionPayload, fallbackLabel = "Primary Mantle Wallet"): WatchedWalletProfile {
   const address = assignSingleWallet(payload.address || payload.text || "");
+  const curated = lookupEntityLabel(env, address);
   return {
     address,
-    label: payload.name || fallbackLabel,
-    category: payload.category || "custom",
-    importance: payload.importance || "medium",
-    notes: payload.text && payload.text !== address ? payload.text : undefined,
+    label: payload.name || curated?.label || fallbackLabel,
+    category: payload.category || curated?.category || "custom",
+    importance: payload.importance || curated?.importance || "medium",
+    labelSource: payload.name || payload.category || payload.importance ? "operator" : curated?.labelSource,
+    notes: payload.text && payload.text !== address ? payload.text : curated?.notes,
     createdAt: new Date().toISOString(),
   };
 }
 
-function watchWallet(payload: ActionPayload): AppState {
-  const profile = walletProfileFromPayload(payload);
+function watchWallet(env: RuntimeEnv, payload: ActionPayload): AppState {
+  const profile = walletProfileFromPayload(env, payload);
   return mutateState((state) => {
     state.agentCreated = true;
     state.walletWatched = true;
@@ -148,8 +151,8 @@ function watchWallet(payload: ActionPayload): AppState {
   });
 }
 
-function addWatchedWallet(payload: ActionPayload): AppState {
-  const profile = walletProfileFromPayload(payload, "Watched Mantle Wallet");
+function addWatchedWallet(env: RuntimeEnv, payload: ActionPayload): AppState {
+  const profile = walletProfileFromPayload(env, payload, "Watched Mantle Wallet");
   return mutateState((state) => {
     state.agentCreated = true;
     state.walletWatched = true;

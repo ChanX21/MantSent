@@ -15,6 +15,10 @@ export type MantleSignalType =
   | "Large ERC-20 Outflow"
   | "New Counterparty"
   | "Treasury Burst"
+  | "Treasury Outflow Spike"
+  | "Exchange Deposit Flow"
+  | "Whale Wallet Exit"
+  | "Protocol Treasury Rotation"
   | "Fresh Wallet Funding"
   | "Watchlist Interaction"
   | "Zero-Value Activity Burst"
@@ -33,6 +37,7 @@ export interface WatchedWalletProfile {
   label: string;
   category: WatchlistCategory;
   importance: WatchlistImportance;
+  labelSource?: "operator" | "curated" | "system";
   notes?: string;
   createdAt: string;
 }
@@ -165,6 +170,7 @@ export interface RuntimeEnv {
   MANTSENT_AGENT_NAME?: string;
   MANTSENT_AGENT_URI?: string;
   MANTSENT_ENABLE_DEMO_MODE?: string;
+  MANTSENT_ENTITY_LABELS?: string;
   AI_PROVIDER?: AiProvider;
   OPENAI_MODEL?: string;
   OPENAI_API_KEY?: string;

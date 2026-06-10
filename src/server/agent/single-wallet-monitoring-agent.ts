@@ -158,11 +158,16 @@ function signalTypeFor(
     outflowAmountMnt: string;
     thresholdMnt: number;
     asset?: "MNT" | "ERC20";
+    walletCategory?: "treasury" | "whale" | "protocol" | "exchange" | "fresh" | "custom";
   },
   source: MantleSignalSource,
 ): MantleSignalType {
   if (source === "burst_window") return "Treasury Burst";
   if (source === "zero_value_call") return "Zero-Value Activity Burst";
+  if (input.walletCategory === "treasury" && (input.direction ?? "outgoing") === "outgoing") return "Treasury Outflow Spike";
+  if (input.walletCategory === "exchange" && (input.direction ?? "outgoing") === "incoming") return "Exchange Deposit Flow";
+  if (input.walletCategory === "whale" && (input.direction ?? "outgoing") === "outgoing") return "Whale Wallet Exit";
+  if (input.walletCategory === "protocol") return "Protocol Treasury Rotation";
   if (input.asset === "ERC20") return "Large ERC-20 Outflow";
   if (input.decision.recipientFirstSeen) return "New Counterparty";
   if ((input.direction ?? "outgoing") === "incoming") return "Fresh Wallet Funding";
