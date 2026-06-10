@@ -493,10 +493,51 @@ code {
 }
 
 .status-stack,
-.setup-list {
+.setup-list,
+.alpha-radar,
+.coverage-grid,
+.taxonomy-list {
   display: grid;
   gap: 10px;
   padding: 0 22px 22px;
+}
+
+.alpha-radar {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.alpha-radar div,
+.coverage-grid div,
+.taxonomy-list div {
+  display: grid;
+  gap: 6px;
+  min-height: 78px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.alpha-radar strong,
+.coverage-grid strong,
+.taxonomy-list strong {
+  color: var(--mantle-soft);
+  font-size: 1.45rem;
+}
+
+.alpha-radar small,
+.coverage-grid small {
+  color: var(--muted);
+}
+
+.coverage-grid {
+  grid-template-columns: 1fr;
+}
+
+.taxonomy-list div {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 54px;
 }
 
 .status-badge {

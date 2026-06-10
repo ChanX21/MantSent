@@ -89,7 +89,7 @@ function short(hash) {
 // src/client/components.ts
 function alertCard() {
   const latest = state.incidents[0];
-  const amount = latest?.outflowAmountMnt || "Unknown";
+  const amount = incidentAmount(latest);
   const recipient = latest?.recipient || agent.recipient || "Pending";
   const evidence = latest?.evidenceTxHash || agent.tx;
   const score = latest?.signalScore ?? 0;
@@ -103,7 +103,7 @@ function alertCard() {
       </div>
       <p>${severity} signal generated from the configured wallet policy and confirmed Mantle activity.</p>
       <div class="alert-facts">
-        <span>Amount ${amount} MNT</span>
+        <span>Amount ${amount}</span>
         <span>Recipient ${recipient}</span>
         <span>Policy ${state.policy?.transactionCountThreshold ? `${state.policy.transactionCountThreshold}+ tx burst` : state.policy?.triggerOnAnyTransaction ? "any outgoing transaction" : state.thresholdMnt <= 0 ? "any MNT outflow" : `>${state.thresholdMnt} MNT`}</span>
         <span>Evidence ${short(evidence)}</span>
@@ -186,11 +186,66 @@ function signalTable(incidents) {
               <strong>${incident.signalType || incident.severity}</strong>
               <span>${incident.signalScore ?? "Pending"}</span>
               <span>${incident.outcome}</span>
-              <span>${incident.outflowAmountMnt} MNT</span>
+              <span>${incidentAmount(incident)}</span>
               <code>${short(incident.evidenceTxHash)}</code>
             </div>
           `
   ).join("")}
+    </div>
+  `;
+}
+function alphaRadar(incidents) {
+  const maxScore = Math.max(0, ...incidents.map((incident) => incident.signalScore || 0));
+  const averageScore = incidents.length ? Math.round(incidents.reduce((sum, incident) => sum + (incident.signalScore || 0), 0) / incidents.length) : 0;
+  const highRelevance = incidents.filter((incident) => incident.investorRelevance === "high").length;
+  const unresolved = incidents.filter((incident) => incident.outcome === "Unresolved").length;
+  const rows = [
+    ["Peak signal", maxScore, "Highest scored anomaly"],
+    ["Average score", averageScore, "Mean signal intensity"],
+    ["High relevance", highRelevance, "Investor-grade flags"],
+    ["Open reviews", unresolved, "Needs operator label"]
+  ];
+  return `
+    <div class="alpha-radar">
+      ${rows.map(
+    ([label, value, detail]) => `
+            <div>
+              <span>${label}</span>
+              <strong>${value}</strong>
+              <small>${detail}</small>
+            </div>
+          `
+  ).join("")}
+    </div>
+  `;
+}
+function dataCoverage(incidents) {
+  const native = incidents.filter((incident) => (incident.asset || "MNT") === "MNT").length;
+  const erc20 = incidents.filter((incident) => incident.asset === "ERC20").length;
+  const total = Math.max(1, incidents.length);
+  return `
+    <div class="coverage-grid">
+      <div>
+        <span>Native MNT</span>
+        <strong>${native}</strong>
+        <small>${Math.round(native / total * 100)}% of signals</small>
+      </div>
+      <div>
+        <span>ERC-20 transfers</span>
+        <strong>${erc20}</strong>
+        <small>${Math.round(erc20 / total * 100)}% of signals</small>
+      </div>
+    </div>
+  `;
+}
+function signalTaxonomy(incidents) {
+  const counts = /* @__PURE__ */ new Map();
+  for (const incident of incidents) counts.set(incident.signalType || incident.severity, (counts.get(incident.signalType || incident.severity) || 0) + 1);
+  const rows = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  if (!rows.length) return `<div class="empty-state compact-empty"><strong>No taxonomy yet</strong><p>Signal categories appear after policy matches.</p></div>`;
+  return `
+    <div class="taxonomy-list">
+      ${rows.map(([label, count]) => `<div><span>${label}</span><strong>${count}</strong></div>`).join("")}
     </div>
   `;
 }
@@ -212,6 +267,11 @@ function statusBadge(label, value, tone = "neutral") {
     </div>
   `;
 }
+function incidentAmount(incident) {
+  if (!incident) return "Unknown";
+  if (incident.asset === "ERC20") return `${incident.tokenAmount || "Unknown"} ${incident.tokenSymbol || "ERC20"}`;
+  return `${incident.outflowAmountMnt} MNT`;
+}
 
 // src/client/views.ts
 function analyticsDashboardView() {
@@ -219,6 +279,8 @@ function analyticsDashboardView() {
   const unresolved = state.incidents.filter((incident) => incident.outcome === "Unresolved").length;
   const suspicious = state.incidents.filter((incident) => incident.outcome === "Suspicious Activity").length;
   const realSignals = state.incidents.filter((incident) => incident.source === "mantle-transaction").length;
+  const tokenSignals = state.incidents.filter((incident) => incident.asset === "ERC20").length;
+  const maxSignalScore = Math.max(0, ...state.incidents.map((incident) => incident.signalScore || 0));
   const latest = state.incidents[0];
   const walletProfile = state.watchedWallets[0];
   return `
@@ -227,7 +289,8 @@ function analyticsDashboardView() {
         ${analyticsCard("Monitoring", state.monitorActive ? "Live" : "Off", state.monitorActive ? "Polling Mantle for wallet outflows" : "Start monitoring from Telegram", state.monitorActive ? "good" : "warn")}
         ${analyticsCard("Watched wallet", walletProfile?.label || (agent.wallet ? short(agent.wallet) : "Not set"), walletProfile ? `${walletProfile.category} \xB7 ${walletProfile.importance} importance` : agent.wallet ? "Single-wallet scope is configured" : "Use /watch in Telegram", agent.wallet ? "good" : "warn")}
         ${analyticsCard("Policy", policyTitle(), state.policyActive ? policyDetail() : "Use /policy in Telegram", state.policyActive ? "good" : "warn")}
-        ${analyticsCard("Signals", String(alerts), `${realSignals} real Mantle transaction${realSignals === 1 ? "" : "s"}`, alerts ? "danger" : "neutral")}
+        ${analyticsCard("Alpha score", `${maxSignalScore}/100`, alerts ? "Peak scored Mantle signal" : "Awaiting first signal", maxSignalScore >= 80 ? "danger" : maxSignalScore >= 60 ? "warn" : "neutral")}
+        ${analyticsCard("Data coverage", `${realSignals} real`, `${tokenSignals} ERC-20 transfer signal${tokenSignals === 1 ? "" : "s"}`, realSignals ? "good" : "neutral")}
       </section>
 
       <section class="dashboard-grid">
@@ -253,6 +316,26 @@ function analyticsDashboardView() {
             ${metric("Suspicious", suspicious)}
             ${metric("Real tx", realSignals)}
           </div>
+        </article>
+
+        <article class="chart-panel">
+          <div class="panel-head compact">
+            <div>
+              <span class="eyebrow">Alpha radar</span>
+              <h2>Signal quality</h2>
+            </div>
+          </div>
+          ${alphaRadar(state.incidents)}
+        </article>
+
+        <article class="chart-panel">
+          <div class="panel-head compact">
+            <div>
+              <span class="eyebrow">Data source</span>
+              <h2>Mantle coverage</h2>
+            </div>
+          </div>
+          ${dataCoverage(state.incidents)}
         </article>
 
         <aside class="chart-panel">
@@ -284,6 +367,16 @@ function analyticsDashboardView() {
             ${statusBadge("Identity", agent.identityStatus === "erc8004-registered" ? "ERC-8004 registered" : "Local profile", agent.identityStatus === "erc8004-registered" ? "good" : "warn")}
             ${statusBadge("AI", aiLabel(), state.openAiConfigured ? "good" : "neutral")}
           </div>
+        </article>
+
+        <article class="chart-panel">
+          <div class="panel-head compact">
+            <div>
+              <span class="eyebrow">Methodology</span>
+              <h2>Signal taxonomy</h2>
+            </div>
+          </div>
+          ${signalTaxonomy(state.incidents)}
         </article>
 
         <article class="chart-panel wide">
