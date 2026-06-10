@@ -540,7 +540,7 @@ Monitor: ${state.monitorActive ? "Live" : "Off"}${latest ? `
 <b>Latest signal</b>
 ${escapeHtml(latest.signalType || "Policy Match")} · ${escapeHtml(signalSeverityLabel(latest.signalSeverity, latest.severity))} · ${escapeHtml(latest.outcome)}
 Score: ${latest.signalScore ?? "Pending"}/100 · Relevance: ${escapeHtml(latest.investorRelevance || "pending")}
-Amount: ${escapeHtml(latest.outflowAmountMnt)} MNT
+Amount: ${escapeHtml(incidentAmount(latest))}
 Evidence: ${state.evidenceSource === "mantle-transaction" ? "Confirmed Mantle transaction" : "Non-live/demo evidence"}
 
 <b>Agent explanation</b>
@@ -570,6 +570,7 @@ function policySummary(state: PublicState): string {
   if (state.policy.rawText) return state.policy.rawText;
   if (state.policy.transactionCountThreshold) return `${state.policy.transactionCountThreshold}+ transactions in ${Math.round((state.policy.transactionWindowSeconds || 300) / 60)} mins`;
   if (state.policy.triggerOnAnyTransaction) return "any outgoing transaction";
+  if (state.policy.asset === "ERC20") return `>${state.policy.thresholdToken ?? state.thresholdMnt} ${state.policy.tokenSymbol || "ERC-20"}`;
   const threshold = state.thresholdMnt <= 0 ? "any MNT outflow" : `>${state.thresholdMnt} MNT`;
   const recipient = state.policy.escalateNewRecipient ? ", new recipient escalation" : "";
   return `${threshold}${recipient}`;
@@ -590,6 +591,11 @@ function aiLabel(state: PublicState): string {
 
 function signalSeverityLabel(signalSeverity: string | undefined, fallback: string): string {
   return signalSeverity ? signalSeverity.toUpperCase() : fallback;
+}
+
+function incidentAmount(incident: PublicState["incidents"][number]): string {
+  if (incident.asset === "ERC20") return `${incident.tokenAmount || "unknown"} ${incident.tokenSymbol || "ERC20"}`;
+  return `${incident.outflowAmountMnt} MNT`;
 }
 
 function escapeHtml(value: string): string {
