@@ -572,7 +572,7 @@ function rememberChat(chatId: number): void {
 }
 
 function statusText(state: PublicState, chainId?: string): string {
-  const proofs = proofLines(state, chainId);
+  const proofs = proofTimelineText(state, chainId);
   const latest = state.incidents[0];
   return `<b>MantSent on Mantle</b>
 ${escapeHtml(mantleProofTagline)}
@@ -601,19 +601,19 @@ Evidence: ${state.evidenceSource === "mantle-transaction" ? "Confirmed Mantle tr
 <b>Agent explanation</b>
 ${formatTelegramExplanation(latest.explanation)}` : ""}
 ${proofs ? `
-<b>Proofs</b>
+<b>Proof timeline</b>
 ${proofs}` : ""}`;
 }
 
-function proofLines(state: PublicState, chainId?: string): string {
+function proofTimelineText(state: PublicState, chainId?: string): string {
   return [
-    state.agentRegistrationTxHash ? proofLink("Identity", state.agentRegistrationTxHash, chainId) : "",
-    state.policyTxHash ? proofLink("Policy", state.policyTxHash, chainId) : "",
-    state.alertTxHash ? proofLink("Alert", state.alertTxHash, chainId) : "",
-    state.outcomeTxHash ? proofLink("Outcome", state.outcomeTxHash, chainId) : "",
+    state.agentRegistrationTxHash ? `1. Agent identity: ${proofLink("proof", state.agentRegistrationTxHash, chainId)}` : "",
+    state.policyTxHash ? `2. Policy committed: ${proofLink("proof", state.policyTxHash, chainId)}` : "",
+    state.alertTxHash ? `3. Alert committed: ${proofLink("proof", state.alertTxHash, chainId)}` : "",
+    state.outcomeTxHash ? `4. Outcome recorded: ${proofLink("proof", state.outcomeTxHash, chainId)}` : "",
   ]
     .filter(Boolean)
-    .join("  |  ");
+    .join("\n");
 }
 
 function proofLink(label: string, txHash: string, chainId?: string): string {

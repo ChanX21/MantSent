@@ -185,6 +185,31 @@ export function signalTaxonomy(incidents: PublicState["incidents"]): string {
   `;
 }
 
+export function proofTimeline(): string {
+  const rows = [
+    ["Agent identity", agent.identityStatus === "erc8004-registered", state.agentRegistrationTxHash],
+    ["Policy committed", state.policyActive, agent.policyTx],
+    ["Alert committed", state.transferDetected, agent.alertTx],
+    ["Outcome recorded", state.resolved, agent.outcomeTx],
+  ] as const;
+
+  return `
+    <div class="proof-timeline">
+      ${rows
+        .map(
+          ([label, done, txHash]) => `
+            <div class="${done ? "done" : ""}">
+              <span></span>
+              <strong>${label}</strong>
+              <small>${done ? proofValue(txHash) : "Pending"}</small>
+            </div>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
 function bucketIncidents(incidents: PublicState["incidents"]): number[] {
   const bucketCount = 18;
   const buckets = Array.from({ length: bucketCount }, () => 0);

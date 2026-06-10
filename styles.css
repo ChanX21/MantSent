@@ -496,7 +496,8 @@ code {
 .setup-list,
 .alpha-radar,
 .coverage-grid,
-.taxonomy-list {
+.taxonomy-list,
+.proof-timeline {
   display: grid;
   gap: 10px;
   padding: 0 22px 22px;
@@ -538,6 +539,35 @@ code {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   min-height: 54px;
+}
+
+.proof-timeline div {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 54px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.proof-timeline span {
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+}
+
+.proof-timeline .done span {
+  border-color: var(--mantle);
+  background: var(--mantle);
+  box-shadow: 0 0 16px rgba(34, 212, 143, 0.72);
+}
+
+.proof-timeline small {
+  overflow-wrap: anywhere;
 }
 
 .status-badge {

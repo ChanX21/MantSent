@@ -1,4 +1,4 @@
-import { alertCard, alphaRadar, analyticsCard, dataCoverage, metric, setupChecklist, signalTable, signalTaxonomy, sparkBars, statusBadge } from "./components.js";
+import { alertCard, alphaRadar, analyticsCard, dataCoverage, metric, proofTimeline, setupChecklist, signalTable, signalTaxonomy, sparkBars, statusBadge } from "./components.js";
 import { cls, short } from "./format.js";
 import { agent, setupProgress, state } from "./state.js";
 
@@ -128,6 +128,16 @@ export function analyticsDashboardView(): string {
             </div>
           </div>
           ${setupChecklist()}
+        </article>
+
+        <article class="chart-panel">
+          <div class="panel-head compact">
+            <div>
+              <span class="eyebrow">Verifiability</span>
+              <h2>Proof timeline</h2>
+            </div>
+          </div>
+          ${proofTimeline()}
         </article>
 
         <article class="chart-panel">

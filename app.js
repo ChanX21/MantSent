@@ -77,6 +77,17 @@ function setupProgress() {
   return Math.round(complete / setupItems.length * 100);
 }
 
+// src/shared/explorer.ts
+function mantleExplorerBase(chainId) {
+  return Number(chainId) === 5e3 ? "https://explorer.mantle.xyz" : "https://explorer.sepolia.mantle.xyz";
+}
+function mantleTxUrl(txHash, chainId) {
+  return `${mantleExplorerBase(chainId)}/tx/${txHash}`;
+}
+function isTxHash(value) {
+  return /^0x[a-fA-F0-9]{64}$/.test(value);
+}
+
 // src/client/format.ts
 function cls(flag) {
   return flag ? "is-on" : "";
@@ -84,6 +95,15 @@ function cls(flag) {
 function short(hash) {
   if (!hash || hash.length < 18) return hash;
   return `${hash.slice(0, 10)}...${hash.slice(-8)}`;
+}
+function txLink(hash, label = short(hash)) {
+  if (!hash) return "Pending";
+  return `<a class="proof-link" href="${mantleTxUrl(hash)}" target="_blank" rel="noreferrer">${label}</a>`;
+}
+function proofValue(hash) {
+  if (!hash) return "Pending";
+  if (isTxHash(hash)) return txLink(hash);
+  return `<code title="Hash only; no transaction receipt">${short(hash)}</code>`;
 }
 
 // src/client/components.ts
@@ -249,6 +269,27 @@ function signalTaxonomy(incidents) {
     </div>
   `;
 }
+function proofTimeline() {
+  const rows = [
+    ["Agent identity", agent.identityStatus === "erc8004-registered", state.agentRegistrationTxHash],
+    ["Policy committed", state.policyActive, agent.policyTx],
+    ["Alert committed", state.transferDetected, agent.alertTx],
+    ["Outcome recorded", state.resolved, agent.outcomeTx]
+  ];
+  return `
+    <div class="proof-timeline">
+      ${rows.map(
+    ([label, done, txHash]) => `
+            <div class="${done ? "done" : ""}">
+              <span></span>
+              <strong>${label}</strong>
+              <small>${done ? proofValue(txHash) : "Pending"}</small>
+            </div>
+          `
+  ).join("")}
+    </div>
+  `;
+}
 function bucketIncidents(incidents) {
   const bucketCount = 18;
   const buckets = Array.from({ length: bucketCount }, () => 0);
@@ -399,6 +440,16 @@ function analyticsDashboardView() {
             </div>
           </div>
           ${setupChecklist()}
+        </article>
+
+        <article class="chart-panel">
+          <div class="panel-head compact">
+            <div>
+              <span class="eyebrow">Verifiability</span>
+              <h2>Proof timeline</h2>
+            </div>
+          </div>
+          ${proofTimeline()}
         </article>
 
         <article class="chart-panel">
