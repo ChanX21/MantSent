@@ -32,11 +32,11 @@ export function render(): void {
       </header>
       <section class="hero-band">
         <div class="hero-copy">
-          <span class="eyebrow">Analytics command center</span>
-          <h1>Mantle wallet intelligence for agent-monitored activity.</h1>
-          <p>${mantleProofTagline}. Operate from Telegram, analyze the live wallet posture here.</p>
+          <span class="eyebrow">Treasury intelligence radar</span>
+          <h1>Mantle investor signals from labelled treasury and protocol wallets.</h1>
+          <p>${mantleProofTagline}. Operate from Telegram, analyze wallet flow, contract interactions, and signal quality here.</p>
           <div class="hero-actions" aria-label="MantSent quick status">
-            <a href="#dashboard">View Analytics</a>
+            <a href="#dashboard">View Signals</a>
             <span>Agent ${setupProgress()}% ready</span>
             <span>${state.monitorActive ? "Live monitor" : "Monitor pending"}</span>
           </div>

@@ -11,14 +11,15 @@ export function analyticsDashboardView(): string {
   const maxSignalScore = Math.max(0, ...state.incidents.map((incident) => incident.signalScore || 0));
   const latest = state.incidents[0];
   const walletProfile = state.watchedWallets[0];
+  const watchedWalletCount = state.watchedWallets.length;
 
   return `
     <main id="dashboard" class="analytics-dashboard">
       <section class="kpi-grid" aria-label="MantSent analytics summary">
-        ${analyticsCard("Monitoring", state.monitorActive ? "Live" : "Off", state.monitorActive ? "Polling Mantle for wallet outflows" : "Start monitoring from Telegram", state.monitorActive ? "good" : "warn")}
-        ${analyticsCard("Watched wallet", walletProfile?.label || (agent.wallet ? short(agent.wallet) : "Not set"), walletProfile ? `${walletProfile.category} · ${walletProfile.importance} importance` : agent.wallet ? "Single-wallet scope is configured" : "Use /watch in Telegram", agent.wallet ? "good" : "warn")}
+        ${analyticsCard("Treasury monitor", state.monitorActive ? "Live" : "Off", state.monitorActive ? "Polling Mantle wallet and token flow" : "Start monitoring from Telegram", state.monitorActive ? "good" : "warn")}
+        ${analyticsCard("Watchlist", watchedWalletCount ? `${watchedWalletCount} wallets` : "Not set", walletProfile ? `${walletProfile.label} · ${walletProfile.category}` : "Use /watch or /watch_add in Telegram", watchedWalletCount ? "good" : "warn")}
         ${analyticsCard("Policy", policyTitle(), state.policyActive ? policyDetail() : "Use /policy in Telegram", state.policyActive ? "good" : "warn")}
-        ${analyticsCard("Alpha score", `${maxSignalScore}/100`, alerts ? "Peak scored Mantle signal" : "Awaiting first signal", maxSignalScore >= 80 ? "danger" : maxSignalScore >= 60 ? "warn" : "neutral")}
+        ${analyticsCard("Investor signal", `${maxSignalScore}/100`, alerts ? "Peak scored Mantle signal" : "Awaiting first signal", maxSignalScore >= 80 ? "danger" : maxSignalScore >= 60 ? "warn" : "neutral")}
         ${analyticsCard("Data coverage", `${realSignals} real`, `${tokenSignals} ERC-20 transfer signal${tokenSignals === 1 ? "" : "s"}`, realSignals ? "good" : "neutral")}
       </section>
 
@@ -26,8 +27,8 @@ export function analyticsDashboardView(): string {
         <article class="chart-panel wide">
           <div class="panel-head">
             <div>
-              <span class="eyebrow">Wallet risk</span>
-              <h2>Signal flow</h2>
+              <span class="eyebrow">Treasury risk</span>
+              <h2>Investor signal flow</h2>
             </div>
             <span class="pill ${cls(state.online)}">Backend ${state.online ? "online" : "offline"}</span>
           </div>
@@ -71,16 +72,17 @@ export function analyticsDashboardView(): string {
           <div class="panel-head compact">
             <div>
               <span class="eyebrow">Operator workflow</span>
-              <h2>Telegram controls</h2>
+              <h2>Telegram control plane</h2>
             </div>
           </div>
-          <p class="panel-copy">Primary actions live in Telegram. The website is a read-only analytics surface for the currently configured deployment.</p>
+          <p class="panel-copy">Primary actions live in Telegram. The website is a read-only signal surface for the active treasury watchlist.</p>
           <div class="command-grid">
             <code>/start</code>
             <code>/watch 0x...</code>
+            <code>/watch_add ...</code>
             <code>/policy ...</code>
             <code>/monitor</code>
-            <code>/reset</code>
+            <code>/brief</code>
           </div>
         </aside>
 
@@ -111,7 +113,7 @@ export function analyticsDashboardView(): string {
         <article class="chart-panel wide">
           <div class="panel-head">
             <div>
-              <span class="eyebrow">Recent activity</span>
+              <span class="eyebrow">Investor signals</span>
               <h2>Signals and outcomes</h2>
             </div>
             <span class="pill">${state.incidents.length ? "Live ledger view" : "No incidents yet"}</span>
@@ -143,15 +145,15 @@ export function analyticsDashboardView(): string {
         <article class="chart-panel">
           <div class="panel-head compact">
             <div>
-              <span class="eyebrow">User model</span>
-              <h2>Access scope</h2>
+              <span class="eyebrow">Product scope</span>
+              <h2>Operator scope</h2>
             </div>
           </div>
-          <p class="panel-copy">This frontend does not identify separate users yet. It reads one deployment state controlled by the authorized Telegram operator and server admin token.</p>
+          <p class="panel-copy">This build is intentionally scoped to one authorized operator managing a labelled treasury watchlist.</p>
           <div class="scope-box">
             <span>Current scope</span>
-            <strong>Single operator</strong>
-            <small>Multi-user support needs login, per-user agents, per-chat wallets, and a real database.</small>
+            <strong>Single operator, multi-wallet</strong>
+            <small>Production SaaS expansion needs login, per-user agents, and a database.</small>
           </div>
         </article>
       </section>
@@ -162,8 +164,8 @@ export function analyticsDashboardView(): string {
 function noAlertState(): string {
   return `
     <div class="empty-state compact-empty">
-      <strong>No policy-matching outflow detected</strong>
-      <p>Once Telegram monitoring is enabled, confirmed Mantle transfers that match the policy will appear here.</p>
+      <strong>No investor signal detected</strong>
+      <p>Once Telegram monitoring is enabled, confirmed Mantle transactions, ERC-20 transfers, or known contract interactions that match the policy will appear here.</p>
     </div>
   `;
 }
