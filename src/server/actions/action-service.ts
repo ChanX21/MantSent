@@ -204,6 +204,7 @@ async function simulateTransfer(env: RuntimeEnv, payload: ActionPayload): Promis
       hash: evidenceTxHash,
       from: current.watchedWallet,
       to: recipient,
+      asset: "MNT",
       amountMnt: 25,
       direction: "outgoing",
     },

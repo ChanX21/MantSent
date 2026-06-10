@@ -2,12 +2,15 @@ import assert from "node:assert/strict";
 import { parsePolicy } from "../src/server/policy/policy-parser.js";
 
 type Expected = {
+  asset?: "MNT" | "ERC20" | "ANY";
+  tokenSymbol?: string;
   count?: number;
   windowSeconds?: number;
   direction?: "incoming" | "outgoing" | "both";
   any?: boolean;
   includeZero?: boolean;
   threshold?: number;
+  thresholdToken?: number;
 };
 
 const burstCases: Array<[string, Expected]> = [
@@ -99,9 +102,15 @@ const thresholdCases: Array<[string, Expected]> = [
   ["alert if more than 100 MNT outflow to new recipient", { threshold: 100, direction: "outgoing" }],
 ];
 
+const tokenCases: Array<[string, Expected]> = [
+  ["alert me if USDC token moves", { asset: "ERC20", tokenSymbol: "USDC" }],
+  ["alert if ERC20 transfer happens", { asset: "ERC20", any: true }],
+  ["alert if more than 1000 USDT leaves", { asset: "ERC20", tokenSymbol: "USDT", thresholdToken: 1000, direction: "outgoing" }],
+  ["notify on any WMNT token transfer", { asset: "ERC20", tokenSymbol: "WMNT", any: true }],
+  ["alert if token FBTC over 1 leaves", { asset: "ERC20", tokenSymbol: "FBTC", thresholdToken: 1, direction: "outgoing" }],
+];
+
 const unsupportedCases = [
-  "alert me if USDC token moves",
-  "alert if ERC20 transfer happens",
   "alert if NFT is sent",
   "alert on ERC721 transfer",
   "alert on ERC1155 transfer",
@@ -112,17 +121,20 @@ const unsupportedCases = [
   "alert on contract event log",
 ];
 
-const supportedCases = [...burstCases, ...anyCases, ...thresholdCases];
-assert.equal(supportedCases.length + unsupportedCases.length, 90);
+const supportedCases = [...burstCases, ...anyCases, ...thresholdCases, ...tokenCases];
+assert.equal(supportedCases.length + unsupportedCases.length, 93);
 
 for (const [text, expected] of supportedCases) {
   const policy = parsePolicy(text);
+  if (expected.asset !== undefined) assert.equal(policy.asset, expected.asset, text);
+  if (expected.tokenSymbol !== undefined) assert.equal(policy.tokenSymbol, expected.tokenSymbol, text);
   if (expected.count !== undefined) assert.equal(policy.transactionCountThreshold, expected.count, text);
   if (expected.windowSeconds !== undefined) assert.equal(policy.transactionWindowSeconds, expected.windowSeconds, text);
   if (expected.direction !== undefined) assert.equal(policy.direction, expected.direction, text);
   if (expected.any !== undefined) assert.equal(policy.triggerOnAnyTransaction, expected.any, text);
   if (expected.includeZero !== undefined) assert.equal(policy.includeZeroValue, expected.includeZero, text);
   if (expected.threshold !== undefined) assert.equal(policy.thresholdMnt, expected.threshold, text);
+  if (expected.thresholdToken !== undefined) assert.equal(policy.thresholdToken, expected.thresholdToken, text);
 }
 
 for (const text of unsupportedCases) {

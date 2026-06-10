@@ -57,10 +57,15 @@ export function buildAgentExplanation(input: {
 
 export async function buildIncident(input: {
   evidenceTxHash: string;
+  evidenceKey?: string;
   alertTxHash: string;
   decision: PolicyDecision;
   recipient: string;
   outflowAmountMnt: string;
+  asset?: "MNT" | "ERC20";
+  tokenSymbol?: string;
+  tokenAddress?: string;
+  tokenAmount?: string;
   source: EvidenceSource;
   policy: PolicyRule;
   thresholdMnt: number;
@@ -75,10 +80,10 @@ export async function buildIncident(input: {
   const source = signalSourceFor(input);
   const signalType = signalTypeFor(input, source);
   const score = scoreMantleSignal({
-    source,
+    source: input.asset === "ERC20" && source !== "burst_window" ? "erc20_transfer" : source,
     direction: input.direction ?? input.policy.direction ?? "outgoing",
-    amountFormatted: Number(input.outflowAmountMnt),
-    thresholdAmount: input.thresholdMnt,
+    amountFormatted: Number(input.tokenAmount || input.outflowAmountMnt),
+    thresholdAmount: input.asset === "ERC20" ? input.policy.thresholdToken : input.thresholdMnt,
     isNewCounterparty: input.decision.recipientFirstSeen,
     walletCategory: input.walletCategory || "custom",
     walletImportance: input.walletImportance || "medium",
@@ -88,12 +93,16 @@ export async function buildIncident(input: {
   });
   const explanationInput = {
     amountMnt: input.outflowAmountMnt,
+    asset: input.asset || "MNT",
+    tokenSymbol: input.tokenSymbol,
+    tokenAmount: input.tokenAmount,
     recipient: input.recipient,
     thresholdMnt: input.thresholdMnt,
     recipientFirstSeen: input.decision.recipientFirstSeen,
     source: input.source,
     severity: input.decision.severity,
     evidenceTxHash: input.evidenceTxHash,
+    evidenceKey: input.evidenceKey,
     policy: input.policy,
     reasonCodes: input.decision.reasonCodes,
     recentTransactionCount: input.recentTransactionCount,
@@ -115,6 +124,10 @@ export async function buildIncident(input: {
     createdAt: new Date().toISOString(),
     recipient: input.recipient,
     outflowAmountMnt: input.outflowAmountMnt,
+    asset: input.asset || "MNT",
+    tokenSymbol: input.tokenSymbol,
+    tokenAddress: input.tokenAddress,
+    tokenAmount: input.tokenAmount,
     source: input.source,
     explanation: await input.llm.explainAlert(explanationInput),
     explanationProvider: input.llm.id,
@@ -125,8 +138,10 @@ export async function buildIncident(input: {
 function signalSourceFor(input: {
   decision: PolicyDecision;
   outflowAmountMnt: string;
+  asset?: "MNT" | "ERC20";
 }): MantleSignalSource {
   if (input.decision.reasonCodes.includes("TRANSACTION_FREQUENCY")) return "burst_window";
+  if (input.asset === "ERC20") return "erc20_transfer";
   if (Number(input.outflowAmountMnt) === 0) return "zero_value_call";
   return "native_tx";
 }
@@ -137,11 +152,13 @@ function signalTypeFor(
     direction?: "incoming" | "outgoing";
     outflowAmountMnt: string;
     thresholdMnt: number;
+    asset?: "MNT" | "ERC20";
   },
   source: MantleSignalSource,
 ): MantleSignalType {
   if (source === "burst_window") return "Treasury Burst";
   if (source === "zero_value_call") return "Zero-Value Activity Burst";
+  if (input.asset === "ERC20") return "Large ERC-20 Outflow";
   if (input.decision.recipientFirstSeen) return "New Counterparty";
   if ((input.direction ?? "outgoing") === "incoming") return "Fresh Wallet Funding";
   if (Number(input.outflowAmountMnt) >= input.thresholdMnt && input.thresholdMnt > 0) return "Large Native Outflow";

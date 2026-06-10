@@ -4,6 +4,8 @@ export interface TransferCandidate {
   hash: string;
   from: string;
   to: string;
+  asset: "MNT" | "ERC20";
+  tokenSymbol?: string;
   amountMnt: number;
   direction: "incoming" | "outgoing";
   recentTransactionCount?: number;
@@ -18,7 +20,21 @@ export interface PolicyDecision {
 
 export function evaluateTransfer(policy: PolicyRule, transfer: TransferCandidate, seenRecipients: string[]): PolicyDecision {
   const directionMatches = !policy.direction || policy.direction === "both" || policy.direction === transfer.direction;
+  const assetMatches = policy.asset === "ANY" || policy.asset === transfer.asset;
+  const tokenMatches =
+    transfer.asset !== "ERC20" ||
+    !policy.tokenSymbol ||
+    !transfer.tokenSymbol ||
+    policy.tokenSymbol.toLowerCase() === transfer.tokenSymbol.toLowerCase();
   if (!directionMatches) {
+    return {
+      shouldAlert: false,
+      severity: "HIGH",
+      reasonCodes: [],
+      recipientFirstSeen: false,
+    };
+  }
+  if (!assetMatches || !tokenMatches) {
     return {
       shouldAlert: false,
       severity: "HIGH",
@@ -33,11 +49,13 @@ export function evaluateTransfer(policy: PolicyRule, transfer: TransferCandidate
       transfer.recentTransactionCount &&
       transfer.recentTransactionCount >= policy.transactionCountThreshold,
   );
-  const thresholdBreached = Boolean(policy.triggerOnAnyTransaction) || transfer.amountMnt > policy.thresholdMnt;
+  const threshold = transfer.asset === "ERC20" ? policy.thresholdToken ?? policy.thresholdMnt : policy.thresholdMnt;
+  const thresholdBreached = Boolean(policy.triggerOnAnyTransaction) || transfer.amountMnt > threshold;
   const recipientFirstSeen = !seenRecipients.map((address) => address.toLowerCase()).includes(transfer.to.toLowerCase());
   const reasonCodes = [];
 
   if (frequencyBreached) reasonCodes.push("TRANSACTION_FREQUENCY");
+  if (transfer.asset === "ERC20") reasonCodes.push("ERC20_TRANSFER");
   if (policy.triggerOnAnyTransaction) reasonCodes.push("ANY_OUTGOING_TRANSACTION");
   if (thresholdBreached) reasonCodes.push("THRESHOLD_BREACH");
   if (policy.escalateNewRecipient && recipientFirstSeen) reasonCodes.push("NEW_RECIPIENT");

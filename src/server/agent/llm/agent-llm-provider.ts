@@ -2,6 +2,9 @@ import type { AiProvider, EvidenceSource, FeedbackExample, PolicyRule, RuntimeEn
 
 export interface AlertExplanationInput {
   amountMnt: string;
+  asset?: "MNT" | "ERC20";
+  tokenSymbol?: string;
+  tokenAmount?: string;
   recipient: string;
   thresholdMnt: number;
   recipientFirstSeen: boolean;
@@ -23,12 +26,15 @@ export interface AgentLlmProvider {
 export function templateExplanation(input: AlertExplanationInput): string {
   const sourcePhrase = input.source === "mantle-transaction" ? "a confirmed Mantle transaction" : "a simulated demo event";
   const noveltyPhrase = input.recipientFirstSeen ? "first-seen recipient" : "known recipient";
+  const amountPhrase = input.asset === "ERC20" ? `${input.tokenAmount || input.amountMnt} ${input.tokenSymbol || "ERC20"}` : `${input.amountMnt} MNT`;
   const policyPhrase = input.policy.transactionCountThreshold
     ? `${input.policy.transactionCountThreshold}+ transactions within ${Math.round((input.policy.transactionWindowSeconds || 300) / 60)} minutes`
     : input.policy.triggerOnAnyTransaction
       ? "any matching transaction"
-      : `native MNT movement above ${input.thresholdMnt} MNT`;
-  return `MantSent detected ${input.direction || "wallet"} activity via ${sourcePhrase}: ${input.amountMnt} MNT involving ${input.recipient}. The active policy is ${policyPhrase}; triggered signals: ${input.reasonCodes.join(", ") || "policy match"}. Recipient is a ${noveltyPhrase}. Review signer intent and transaction context before assigning an outcome.`;
+      : input.policy.asset === "ERC20"
+        ? `ERC-20 movement above ${input.policy.thresholdToken ?? input.thresholdMnt} ${input.policy.tokenSymbol || "tokens"}`
+        : `native MNT movement above ${input.thresholdMnt} MNT`;
+  return `MantSent detected ${input.direction || "wallet"} activity via ${sourcePhrase}: ${amountPhrase} involving ${input.recipient}. The active policy is ${policyPhrase}; triggered signals: ${input.reasonCodes.join(", ") || "policy match"}. Recipient is a ${noveltyPhrase}. Review signer intent and transaction context before assigning an outcome.`;
 }
 
 export function configuredAiProvider(env: RuntimeEnv): AiProvider {

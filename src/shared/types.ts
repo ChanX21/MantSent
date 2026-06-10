@@ -38,8 +38,10 @@ export interface WatchedWalletProfile {
 }
 
 export interface PolicyRule {
-  asset: "MNT";
+  asset: "MNT" | "ERC20" | "ANY";
+  tokenSymbol?: string;
   thresholdMnt: number;
+  thresholdToken?: number;
   escalateNewRecipient: boolean;
   direction?: "incoming" | "outgoing" | "both";
   includeZeroValue?: boolean;
@@ -67,6 +69,7 @@ export interface AgentProfile {
 
 export interface Incident {
   evidenceTxHash: string;
+  evidenceKey?: string;
   alertTxHash: string;
   severity: Severity;
   signalType?: MantleSignalType;
@@ -79,6 +82,10 @@ export interface Incident {
   createdAt: string;
   recipient: string;
   outflowAmountMnt: string;
+  asset?: "MNT" | "ERC20";
+  tokenSymbol?: string;
+  tokenAddress?: string;
+  tokenAmount?: string;
   source: EvidenceSource;
   explanation: string;
   explanationProvider: AiProvider;

@@ -6,9 +6,14 @@ export function parsePolicy(text = ""): PolicyRule {
   const triggerOnAnyTransaction = anyTransactionPolicy(cleanText);
   const frequency = frequencyPolicy(cleanText);
   const direction = directionFromText(cleanText);
+  const tokenSymbol = tokenSymbolFromText(cleanText);
+  const asset = assetFromText(cleanText, tokenSymbol);
+  const threshold = thresholdFromText(cleanText, triggerOnAnyTransaction, tokenSymbol);
   return {
-    asset: "MNT",
-    thresholdMnt: thresholdFromText(cleanText, triggerOnAnyTransaction),
+    asset,
+    tokenSymbol,
+    thresholdMnt: asset === "MNT" ? threshold : 0,
+    thresholdToken: asset === "ERC20" ? threshold : undefined,
     escalateNewRecipient: /new|first[-\s]?seen|unknown|fresh/i.test(cleanText),
     direction,
     includeZeroValue: triggerOnAnyTransaction || Boolean(frequency),
@@ -19,7 +24,15 @@ export function parsePolicy(text = ""): PolicyRule {
   };
 }
 
-function thresholdFromText(text: string, triggerOnAnyTransaction: boolean): number {
+function thresholdFromText(text: string, triggerOnAnyTransaction: boolean, tokenSymbol?: string): number {
+  if (tokenSymbol) {
+    const escaped = tokenSymbol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const tokenMatch =
+      text.match(new RegExp(`(?:more than|greater than|over|above|exceeds?|>)\\s*(\\d+(?:\\.\\d+)?)\\s*(?:${escaped}|tokens?)`, "i")) ??
+      text.match(new RegExp(`(?:${escaped}|tokens?)\\s*(?:more than|greater than|over|above|exceeds?|>)\\s*(\\d+(?:\\.\\d+)?)`, "i")) ??
+      text.match(new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(?:${escaped}|tokens?)`, "i"));
+    if (tokenMatch?.[1]) return Number(tokenMatch[1]);
+  }
   const match =
     text.match(/(?:more than|greater than|over|above|exceeds?|>)\s*(\d+(?:\.\d+)?)\s*(?:MNT|mantle)/i) ??
     text.match(/(\d+(?:\.\d+)?)\s*(?:MNT|mantle)/i);
@@ -53,12 +66,25 @@ function directionFromText(text: string): "incoming" | "outgoing" | "both" {
 }
 
 function assertSupportedPolicy(text: string): void {
-  if (/\b(erc[-\s]?20|token|usdc|usdt|nft|erc[-\s]?721|erc[-\s]?1155)\b/i.test(text)) {
-    throw new Error("This policy needs token/NFT event indexing. Current live monitor supports native Mantle transactions only.");
+  if (/\b(nft|erc[-\s]?721|erc[-\s]?1155)\b/i.test(text)) {
+    throw new Error("This policy needs NFT event indexing. Current live monitor supports native Mantle transactions and ERC-20 Transfer logs.");
   }
-  if (/\b(failed|reverted|gas|fee|swap|bridge|contract event|log)\b/i.test(text)) {
-    throw new Error("This policy needs receipt/log indexing. Current live monitor supports transaction-level native Mantle policies.");
+  if (/\b(failed|reverted|gas|fee|swap|bridge|contract event)\b/i.test(text)) {
+    throw new Error("This policy needs receipt-level semantic indexing. Current live monitor supports native Mantle transactions and ERC-20 Transfer logs.");
   }
+}
+
+function assetFromText(text: string, tokenSymbol?: string): "MNT" | "ERC20" | "ANY" {
+  if (tokenSymbol || /\b(erc[-\s]?20|token|tokens)\b/i.test(text)) return "ERC20";
+  if (/\b(any asset|all assets|token or mnt|mnt or token|native or token)\b/i.test(text)) return "ANY";
+  return "MNT";
+}
+
+function tokenSymbolFromText(text: string): string | undefined {
+  const known = text.match(/\b(USDC|USDT|WETH|WMNT|METH|CMETH|FBTC|MNT)\b/i)?.[1]?.toUpperCase();
+  if (known && known !== "MNT") return known;
+  const explicit = text.match(/\btoken\s+([A-Z][A-Z0-9]{2,12})\b/)?.[1];
+  return explicit?.toUpperCase();
 }
 
 function countFromText(text: string): number {
