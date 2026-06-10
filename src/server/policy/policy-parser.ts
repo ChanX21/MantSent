@@ -7,7 +7,8 @@ export function parsePolicy(text = ""): PolicyRule {
   const frequency = frequencyPolicy(cleanText);
   const direction = directionFromText(cleanText);
   const tokenSymbol = tokenSymbolFromText(cleanText);
-  const asset = assetFromText(cleanText, tokenSymbol);
+  const contractInteraction = contractInteractionPolicy(cleanText);
+  const asset = contractInteraction ? "ANY" : assetFromText(cleanText, tokenSymbol);
   const threshold = thresholdFromText(cleanText, triggerOnAnyTransaction, tokenSymbol);
   return {
     asset,
@@ -17,9 +18,11 @@ export function parsePolicy(text = ""): PolicyRule {
     escalateNewRecipient: /new|first[-\s]?seen|unknown|fresh/i.test(cleanText),
     direction,
     includeZeroValue: triggerOnAnyTransaction || Boolean(frequency),
-    triggerOnAnyTransaction,
+    triggerOnAnyTransaction: triggerOnAnyTransaction || contractInteraction,
     transactionCountThreshold: frequency?.count,
     transactionWindowSeconds: frequency?.windowSeconds,
+    contractInteraction,
+    contractTypes: contractTypesFromText(cleanText),
     rawText: cleanText || "Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.",
   };
 }
@@ -69,9 +72,21 @@ function assertSupportedPolicy(text: string): void {
   if (/\b(nft|erc[-\s]?721|erc[-\s]?1155)\b/i.test(text)) {
     throw new Error("This policy needs NFT event indexing. Current live monitor supports native Mantle transactions and ERC-20 Transfer logs.");
   }
-  if (/\b(failed|reverted|gas|fee|swap|bridge|contract event)\b/i.test(text)) {
+  if (/\b(failed|reverted|gas|fee|contract event)\b/i.test(text)) {
     throw new Error("This policy needs receipt-level semantic indexing. Current live monitor supports native Mantle transactions and ERC-20 Transfer logs.");
   }
+}
+
+function contractInteractionPolicy(text: string): boolean {
+  return /\b(bridge|bridging|swap|router|known contract|contract interaction|protocol contract)\b/i.test(text);
+}
+
+function contractTypesFromText(text: string): string[] | undefined {
+  const types = [];
+  if (/\bbridge|bridging\b/i.test(text)) types.push("bridge");
+  if (/\bswap|router\b/i.test(text)) types.push("router");
+  if (/\bknown contract|contract interaction|protocol contract\b/i.test(text)) types.push("contract");
+  return types.length ? types : undefined;
 }
 
 function assetFromText(text: string, tokenSymbol?: string): "MNT" | "ERC20" | "ANY" {

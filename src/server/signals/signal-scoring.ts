@@ -26,6 +26,7 @@ export function scoreMantleSignal(input: SignalScoreInput): SignalScoreResult {
   if (input.direction === "outgoing") score += 10;
   if (input.direction === "incoming") score += 5;
   if (input.source === "zero_value_call") score += 5;
+  if (input.source === "contract_interaction") score += 18;
   if (input.source === "erc20_transfer") score += 10;
   if (input.source === "native_tx") score += 8;
 

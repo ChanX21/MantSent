@@ -4,6 +4,8 @@ import { parsePolicy } from "../src/server/policy/policy-parser.js";
 type Expected = {
   asset?: "MNT" | "ERC20" | "ANY";
   tokenSymbol?: string;
+  contractInteraction?: boolean;
+  contractTypes?: string[];
   count?: number;
   windowSeconds?: number;
   direction?: "incoming" | "outgoing" | "both";
@@ -110,24 +112,30 @@ const tokenCases: Array<[string, Expected]> = [
   ["alert if token FBTC over 1 leaves", { asset: "ERC20", tokenSymbol: "FBTC", thresholdToken: 1, direction: "outgoing" }],
 ];
 
+const contractCases: Array<[string, Expected]> = [
+  ["alert if a bridge is used", { asset: "ANY", contractInteraction: true, contractTypes: ["bridge"], any: true }],
+  ["alert on swap router interaction", { asset: "ANY", contractInteraction: true, contractTypes: ["router"], any: true }],
+  ["notify on known contract interaction", { asset: "ANY", contractInteraction: true, contractTypes: ["contract"], any: true }],
+];
+
 const unsupportedCases = [
   "alert if NFT is sent",
   "alert on ERC721 transfer",
   "alert on ERC1155 transfer",
-  "alert if swap happens",
-  "alert if bridge is used",
   "alert if gas fee is high",
   "alert if transaction failed",
   "alert on contract event log",
 ];
 
-const supportedCases = [...burstCases, ...anyCases, ...thresholdCases, ...tokenCases];
-assert.equal(supportedCases.length + unsupportedCases.length, 93);
+const supportedCases = [...burstCases, ...anyCases, ...thresholdCases, ...tokenCases, ...contractCases];
+assert.equal(supportedCases.length + unsupportedCases.length, 94);
 
 for (const [text, expected] of supportedCases) {
   const policy = parsePolicy(text);
   if (expected.asset !== undefined) assert.equal(policy.asset, expected.asset, text);
   if (expected.tokenSymbol !== undefined) assert.equal(policy.tokenSymbol, expected.tokenSymbol, text);
+  if (expected.contractInteraction !== undefined) assert.equal(policy.contractInteraction, expected.contractInteraction, text);
+  if (expected.contractTypes !== undefined) assert.deepEqual(policy.contractTypes, expected.contractTypes, text);
   if (expected.count !== undefined) assert.equal(policy.transactionCountThreshold, expected.count, text);
   if (expected.windowSeconds !== undefined) assert.equal(policy.transactionWindowSeconds, expected.windowSeconds, text);
   if (expected.direction !== undefined) assert.equal(policy.direction, expected.direction, text);

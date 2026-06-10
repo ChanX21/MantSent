@@ -69,6 +69,8 @@ export async function buildIncident(input: {
   tokenSymbol?: string;
   tokenAddress?: string;
   tokenAmount?: string;
+  contractLabel?: string;
+  contractType?: string;
   source: EvidenceSource;
   policy: PolicyRule;
   thresholdMnt: number;
@@ -98,6 +100,8 @@ export async function buildIncident(input: {
     asset: input.asset || "MNT",
     tokenSymbol: input.tokenSymbol,
     tokenAmount: input.tokenAmount,
+    contractLabel: input.contractLabel,
+    contractType: input.contractType,
     recipient: input.recipient,
     thresholdMnt: input.thresholdMnt,
     recipientFirstSeen: input.decision.recipientFirstSeen,
@@ -133,6 +137,8 @@ export async function buildIncident(input: {
     tokenSymbol: input.tokenSymbol,
     tokenAddress: input.tokenAddress,
     tokenAmount: input.tokenAmount,
+    contractLabel: input.contractLabel,
+    contractType: input.contractType,
     source: input.source,
     explanation: await input.llm.explainAlert(explanationInput),
     explanationProvider: input.llm.id,
@@ -146,6 +152,7 @@ function signalSourceFor(input: {
   asset?: "MNT" | "ERC20";
 }): MantleSignalSource {
   if (input.decision.reasonCodes.includes("TRANSACTION_FREQUENCY")) return "burst_window";
+  if (input.decision.reasonCodes.includes("KNOWN_CONTRACT_INTERACTION")) return "contract_interaction";
   if (input.asset === "ERC20") return "erc20_transfer";
   if (Number(input.outflowAmountMnt) === 0) return "zero_value_call";
   return "native_tx";
@@ -159,9 +166,13 @@ function signalTypeFor(
     thresholdMnt: number;
     asset?: "MNT" | "ERC20";
     walletCategory?: "treasury" | "whale" | "protocol" | "exchange" | "fresh" | "custom";
+    contractType?: string;
   },
   source: MantleSignalSource,
 ): MantleSignalType {
+  if (source === "contract_interaction" && input.contractType === "bridge") return "Bridge Contract Interaction";
+  if (source === "contract_interaction" && input.contractType === "router") return "Router Contract Interaction";
+  if (source === "contract_interaction") return "Known Contract Interaction";
   if (source === "burst_window") return "Treasury Burst";
   if (source === "zero_value_call") return "Zero-Value Activity Burst";
   if (input.walletCategory === "treasury" && (input.direction ?? "outgoing") === "outgoing") return "Treasury Outflow Spike";

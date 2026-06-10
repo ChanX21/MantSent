@@ -6,7 +6,7 @@ export type EvidenceSource = "demo" | "mantle-transaction";
 
 export type AgentIdentityStatus = "placeholder" | "erc8004-registered";
 
-export type MantleSignalSource = "native_tx" | "erc20_transfer" | "burst_window" | "zero_value_call";
+export type MantleSignalSource = "native_tx" | "erc20_transfer" | "burst_window" | "zero_value_call" | "contract_interaction";
 
 export type MantleSignalSeverity = "low" | "medium" | "high" | "critical";
 
@@ -19,6 +19,9 @@ export type MantleSignalType =
   | "Exchange Deposit Flow"
   | "Whale Wallet Exit"
   | "Protocol Treasury Rotation"
+  | "Bridge Contract Interaction"
+  | "Router Contract Interaction"
+  | "Known Contract Interaction"
   | "Fresh Wallet Funding"
   | "Watchlist Interaction"
   | "Zero-Value Activity Burst"
@@ -53,6 +56,8 @@ export interface PolicyRule {
   triggerOnAnyTransaction?: boolean;
   transactionCountThreshold?: number;
   transactionWindowSeconds?: number;
+  contractInteraction?: boolean;
+  contractTypes?: string[];
   rawText: string;
 }
 
@@ -94,6 +99,8 @@ export interface Incident {
   tokenSymbol?: string;
   tokenAddress?: string;
   tokenAmount?: string;
+  contractLabel?: string;
+  contractType?: string;
   source: EvidenceSource;
   explanation: string;
   explanationProvider: AiProvider;
@@ -171,6 +178,7 @@ export interface RuntimeEnv {
   MANTSENT_AGENT_URI?: string;
   MANTSENT_ENABLE_DEMO_MODE?: string;
   MANTSENT_ENTITY_LABELS?: string;
+  MANTSENT_KNOWN_CONTRACTS?: string;
   AI_PROVIDER?: AiProvider;
   OPENAI_MODEL?: string;
   OPENAI_API_KEY?: string;

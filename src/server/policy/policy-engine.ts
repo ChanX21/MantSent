@@ -6,6 +6,8 @@ export interface TransferCandidate {
   to: string;
   asset: "MNT" | "ERC20";
   tokenSymbol?: string;
+  contractInteraction?: boolean;
+  contractType?: string;
   amountMnt: number;
   direction: "incoming" | "outgoing";
   recentTransactionCount?: number;
@@ -42,6 +44,17 @@ export function evaluateTransfer(policy: PolicyRule, transfer: TransferCandidate
       recipientFirstSeen: false,
     };
   }
+  if (policy.contractInteraction) {
+    const typeMatches = !policy.contractTypes?.length || (transfer.contractType && policy.contractTypes.includes(transfer.contractType));
+    if (!transfer.contractInteraction || !typeMatches) {
+      return {
+        shouldAlert: false,
+        severity: "HIGH",
+        reasonCodes: [],
+        recipientFirstSeen: false,
+      };
+    }
+  }
 
   const frequencyBreached = Boolean(
     policy.transactionCountThreshold &&
@@ -56,6 +69,7 @@ export function evaluateTransfer(policy: PolicyRule, transfer: TransferCandidate
 
   if (frequencyBreached) reasonCodes.push("TRANSACTION_FREQUENCY");
   if (transfer.asset === "ERC20") reasonCodes.push("ERC20_TRANSFER");
+  if (transfer.contractInteraction) reasonCodes.push("KNOWN_CONTRACT_INTERACTION");
   if (policy.triggerOnAnyTransaction) reasonCodes.push("ANY_OUTGOING_TRANSACTION");
   if (thresholdBreached) reasonCodes.push("THRESHOLD_BREACH");
   if (policy.escalateNewRecipient && recipientFirstSeen) reasonCodes.push("NEW_RECIPIENT");

@@ -4,6 +4,7 @@ import { buildIncident, evaluateAgentTransfer } from "../agent/single-wallet-mon
 import { createAgentLlmProvider } from "../agent/llm/provider-factory.js";
 import { formatMnt, normalizeAddress, provider } from "../chain/mantle.js";
 import { commitAlertProof } from "../chain/proofs.js";
+import { lookupKnownContract } from "../entities/known-contracts.js";
 import { parsePolicy } from "../policy/policy-parser.js";
 import { loadState, mutateState } from "../state/store.js";
 
@@ -62,7 +63,8 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
   if (state.incidents.some((incident) => incident.evidenceTxHash.toLowerCase() === tx.hash.toLowerCase())) return;
 
   const policy = state.policy ?? parsePolicy();
-  if (tx.value <= 0n && !policy.includeZeroValue && !policy.triggerOnAnyTransaction && !policy.transactionCountThreshold) return;
+  const knownContract = lookupKnownContract(env, tx.to);
+  if (tx.value <= 0n && !policy.includeZeroValue && !policy.triggerOnAnyTransaction && !policy.transactionCountThreshold && !policy.contractInteraction) return;
   const amountMnt = Number(formatMnt(tx.value));
   const recipient = normalizeAddress(match.direction === "outgoing" ? tx.to : tx.from);
   const timestamp = Math.floor(Date.now() / 1000);
@@ -74,6 +76,8 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
       from: tx.from,
       to: recipient,
       asset: "MNT",
+      contractInteraction: Boolean(knownContract),
+      contractType: knownContract?.type,
       amountMnt,
       direction: match.direction,
       recentTransactionCount: recentTransactions.length,
@@ -121,6 +125,8 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
     walletCategory: match.wallet.category,
     walletImportance: match.wallet.importance,
     hasWalletLabel: Boolean(match.wallet.label),
+    contractLabel: knownContract?.label,
+    contractType: knownContract?.type,
     feedbackExamples: state.feedbackExamples || [],
     llm,
   });
