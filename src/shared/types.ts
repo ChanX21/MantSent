@@ -80,6 +80,9 @@ export interface Incident {
   investorRelevance?: InvestorRelevance;
   outcome: OutcomeLabel;
   createdAt: string;
+  watchedWallet?: string;
+  walletLabel?: string;
+  walletCategory?: WatchlistCategory;
   recipient: string;
   outflowAmountMnt: string;
   asset?: "MNT" | "ERC20";
@@ -177,6 +180,8 @@ export type ActionName =
   | "deploy_agent"
   | "configure_ai"
   | "watch"
+  | "watch_add"
+  | "watch_remove"
   | "watchlist"
   | "policy"
   | "transfer"

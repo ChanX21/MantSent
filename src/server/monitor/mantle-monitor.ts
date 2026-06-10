@@ -1,5 +1,5 @@
 import { ethers, type Log, type TransactionResponse } from "ethers";
-import type { Incident, RuntimeEnv } from "../../shared/types.js";
+import type { Incident, RuntimeEnv, WatchedWalletProfile } from "../../shared/types.js";
 import { buildIncident, evaluateAgentTransfer } from "../agent/single-wallet-monitoring-agent.js";
 import { createAgentLlmProvider } from "../agent/llm/provider-factory.js";
 import { formatMnt, normalizeAddress, provider } from "../chain/mantle.js";
@@ -18,7 +18,7 @@ export function startMantleMonitor(env: RuntimeEnv, onIncident?: (incident: Inci
 
   async function tick(): Promise<void> {
     const state = loadState();
-    if (!state.monitorActive || !state.walletWatched || !state.policyActive || !state.watchedWallet) return;
+    if (!state.monitorActive || !state.walletWatched || !state.policyActive || !state.watchedWallets.length) return;
 
     const latest = await rpc.getBlockNumber();
     const safeLatest = Math.max(0, latest - confirmations);
@@ -55,20 +55,18 @@ async function scanBlock(env: RuntimeEnv, blockNumber: number, onIncident?: (inc
 
 async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse, onIncident?: (incident: Incident) => Promise<void> | void): Promise<void> {
   const state = loadState();
-  if (!state.monitorActive || !state.walletWatched || !state.policyActive || !state.watchedWallet) return;
+  if (!state.monitorActive || !state.walletWatched || !state.policyActive || !state.watchedWallets.length) return;
   if (!tx.to) return;
-  const watchedWallet = state.watchedWallet.toLowerCase();
-  const direction = tx.from.toLowerCase() === watchedWallet ? "outgoing" : tx.to.toLowerCase() === watchedWallet ? "incoming" : null;
-  if (!direction) return;
+  const match = nativeWalletMatch(state.watchedWallets, tx);
+  if (!match) return;
   if (state.incidents.some((incident) => incident.evidenceTxHash.toLowerCase() === tx.hash.toLowerCase())) return;
 
   const policy = state.policy ?? parsePolicy();
   if (tx.value <= 0n && !policy.includeZeroValue && !policy.triggerOnAnyTransaction && !policy.transactionCountThreshold) return;
   const amountMnt = Number(formatMnt(tx.value));
-  const recipient = normalizeAddress(direction === "outgoing" ? tx.to : tx.from);
-  const watchedWalletProfile = state.watchedWallets.find((wallet) => wallet.address.toLowerCase() === state.watchedWallet.toLowerCase());
+  const recipient = normalizeAddress(match.direction === "outgoing" ? tx.to : tx.from);
   const timestamp = Math.floor(Date.now() / 1000);
-  const recentTransactions = recentTransactionsForPolicy(state.recentTransactions || [], tx.hash, timestamp, policy.transactionWindowSeconds);
+  const recentTransactions = recentTransactionsForPolicy(state.recentTransactions || [], `${match.wallet.address}:${tx.hash}`, timestamp, policy.transactionWindowSeconds);
   const decision = evaluateAgentTransfer(
     { ...state, policy },
     {
@@ -77,7 +75,7 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
       to: recipient,
       asset: "MNT",
       amountMnt,
-      direction,
+      direction: match.direction,
       recentTransactionCount: recentTransactions.length,
     },
   );
@@ -97,6 +95,7 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
     current.evidenceTxHash = tx.hash;
     current.evidenceSource = "mantle-transaction";
     current.recipient = recipient;
+    current.watchedWallet = match.wallet.address;
   });
 
   const proof = await commitAlertProof(env, prepared, {
@@ -111,15 +110,17 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
     alertTxHash: proof.txHash,
     decision,
     recipient,
+    watchedWallet: match.wallet.address,
+    walletLabel: match.wallet.label,
     outflowAmountMnt: formatMnt(tx.value),
     source: "mantle-transaction",
     policy,
     thresholdMnt: policy.thresholdMnt,
     recentTransactionCount: recentTransactions.length,
-    direction,
-    walletCategory: watchedWalletProfile?.category,
-    walletImportance: watchedWalletProfile?.importance,
-    hasWalletLabel: Boolean(watchedWalletProfile?.label),
+    direction: match.direction,
+    walletCategory: match.wallet.category,
+    walletImportance: match.wallet.importance,
+    hasWalletLabel: Boolean(match.wallet.label),
     feedbackExamples: state.feedbackExamples || [],
     llm,
   });
@@ -138,11 +139,11 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
 
 async function scanErc20Transfers(env: RuntimeEnv, blockNumber: number, onIncident?: (incident: Incident) => Promise<void> | void): Promise<void> {
   const state = loadState();
-  if (!state.monitorActive || !state.walletWatched || !state.policyActive || !state.watchedWallet) return;
+  if (!state.monitorActive || !state.walletWatched || !state.policyActive || !state.watchedWallets.length) return;
   const policy = state.policy ?? parsePolicy();
   if (policy.asset === "MNT" && !policy.transactionCountThreshold) return;
   const rpc = provider(env);
-  const watchedTopic = ethers.zeroPadValue(state.watchedWallet, 32).toLowerCase();
+  const watchedTopics = new Map(state.watchedWallets.map((wallet) => [ethers.zeroPadValue(wallet.address, 32).toLowerCase(), wallet]));
   const logs = await rpc.getLogs({
     fromBlock: blockNumber,
     toBlock: blockNumber,
@@ -153,16 +154,17 @@ async function scanErc20Transfers(env: RuntimeEnv, blockNumber: number, onIncide
     if (log.topics.length < 3) continue;
     const fromTopic = log.topics[1]?.toLowerCase();
     const toTopic = log.topics[2]?.toLowerCase();
-    const direction = fromTopic === watchedTopic ? "outgoing" : toTopic === watchedTopic ? "incoming" : null;
-    if (!direction) continue;
-    await maybeProcessTokenTransfer(env, log, direction, onIncident);
+    const outgoingWallet = fromTopic ? watchedTopics.get(fromTopic) : undefined;
+    const incomingWallet = toTopic ? watchedTopics.get(toTopic) : undefined;
+    if (outgoingWallet) await maybeProcessTokenTransfer(env, log, "outgoing", outgoingWallet, onIncident);
+    if (incomingWallet && incomingWallet.address.toLowerCase() !== outgoingWallet?.address.toLowerCase()) await maybeProcessTokenTransfer(env, log, "incoming", incomingWallet, onIncident);
   }
 }
 
-async function maybeProcessTokenTransfer(env: RuntimeEnv, log: Log, direction: "incoming" | "outgoing", onIncident?: (incident: Incident) => Promise<void> | void): Promise<void> {
+async function maybeProcessTokenTransfer(env: RuntimeEnv, log: Log, direction: "incoming" | "outgoing", watchedWalletProfile: WatchedWalletProfile, onIncident?: (incident: Incident) => Promise<void> | void): Promise<void> {
   const state = loadState();
-  if (!state.monitorActive || !state.walletWatched || !state.policyActive || !state.watchedWallet) return;
-  const evidenceKey = `${log.transactionHash}:${log.index}`;
+  if (!state.monitorActive || !state.walletWatched || !state.policyActive || !state.watchedWallets.length) return;
+  const evidenceKey = `${watchedWalletProfile.address}:${log.transactionHash}:${log.index}`;
   if (state.incidents.some((incident) => (incident.evidenceKey || incident.evidenceTxHash).toLowerCase() === evidenceKey.toLowerCase())) return;
 
   const policy = state.policy ?? parsePolicy();
@@ -173,7 +175,6 @@ async function maybeProcessTokenTransfer(env: RuntimeEnv, log: Log, direction: "
   const from = normalizeAddress(ethers.dataSlice(log.topics[1] || "0x", 12));
   const to = normalizeAddress(ethers.dataSlice(log.topics[2] || "0x", 12));
   const recipient = direction === "outgoing" ? to : from;
-  const watchedWalletProfile = state.watchedWallets.find((wallet) => wallet.address.toLowerCase() === state.watchedWallet.toLowerCase());
   const timestamp = Math.floor(Date.now() / 1000);
   const recentTransactions = recentTransactionsForPolicy(state.recentTransactions || [], evidenceKey, timestamp, policy.transactionWindowSeconds);
   const decision = evaluateAgentTransfer(
@@ -202,6 +203,7 @@ async function maybeProcessTokenTransfer(env: RuntimeEnv, log: Log, direction: "
     current.evidenceTxHash = log.transactionHash;
     current.evidenceSource = "mantle-transaction";
     current.recipient = recipient;
+    current.watchedWallet = watchedWalletProfile.address;
   });
   const proof = await commitAlertProof(env, prepared, {
     evidenceTxHash: log.transactionHash,
@@ -216,6 +218,8 @@ async function maybeProcessTokenTransfer(env: RuntimeEnv, log: Log, direction: "
     evidenceKey,
     decision,
     recipient,
+    watchedWallet: watchedWalletProfile.address,
+    walletLabel: watchedWalletProfile.label,
     outflowAmountMnt: "0",
     asset: "ERC20",
     tokenSymbol: token.symbol,
@@ -226,9 +230,9 @@ async function maybeProcessTokenTransfer(env: RuntimeEnv, log: Log, direction: "
     thresholdMnt: policy.thresholdMnt,
     recentTransactionCount: recentTransactions.length,
     direction,
-    walletCategory: watchedWalletProfile?.category,
-    walletImportance: watchedWalletProfile?.importance,
-    hasWalletLabel: Boolean(watchedWalletProfile?.label),
+    walletCategory: watchedWalletProfile.category,
+    walletImportance: watchedWalletProfile.importance,
+    hasWalletLabel: Boolean(watchedWalletProfile.label),
     feedbackExamples: state.feedbackExamples || [],
     llm,
   });
@@ -242,6 +246,20 @@ async function maybeProcessTokenTransfer(env: RuntimeEnv, log: Log, direction: "
     current.incidents.unshift(incident);
   });
   await onIncident?.(incident);
+}
+
+function nativeWalletMatch(
+  watchedWallets: WatchedWalletProfile[],
+  tx: TransactionResponse,
+): { wallet: WatchedWalletProfile; direction: "incoming" | "outgoing" } | null {
+  const from = tx.from.toLowerCase();
+  const to = tx.to?.toLowerCase();
+  for (const wallet of watchedWallets) {
+    const address = wallet.address.toLowerCase();
+    if (from === address) return { wallet, direction: "outgoing" };
+    if (to === address) return { wallet, direction: "incoming" };
+  }
+  return null;
 }
 
 async function tokenMetadata(rpc: ethers.Provider, tokenAddress: string): Promise<{ symbol: string; decimals: number }> {

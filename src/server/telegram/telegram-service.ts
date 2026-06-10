@@ -14,6 +14,7 @@ const setupText =
   "1. <code>/deploy My Agent Name</code>\n" +
   "2. <code>/groq gsk-... llama-3.1-8b-instant</code> optional\n" +
   "3. <code>/watch 0xYourMantleWallet</code>\n" +
+  "   Add more with <code>/watch_add 0x... | Label | treasury | high</code>\n" +
   "4. <code>/label Treasury Ops | treasury | high</code>\n" +
   "5. <code>/policy Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.</code>\n" +
   "6. <code>/monitor</code>";
@@ -241,6 +242,31 @@ export function createTelegramService({
           parse_mode: "HTML",
         });
         await sendStatus(chatId);
+      } else if (command === "/watch_add") {
+        if (!args) {
+          await call("sendMessage", {
+            chat_id: chatId,
+            text: "<b>Add a watched wallet</b>\nUse <code>/watch_add 0xWallet | Label | category | importance</code>",
+            parse_mode: "HTML",
+          });
+          return;
+        }
+        const profile = parseWatchAddArgs(args);
+        await actions.run("watch_add", profile);
+        await call("sendMessage", { chat_id: chatId, text: "<b>Wallet added to watchlist.</b>\nThe live monitor will evaluate matching activity for this wallet.", parse_mode: "HTML" });
+        await sendStatus(chatId);
+      } else if (command === "/watch_remove") {
+        if (!args) {
+          await call("sendMessage", {
+            chat_id: chatId,
+            text: "<b>Remove a watched wallet</b>\nUse <code>/watch_remove 0xWallet</code>",
+            parse_mode: "HTML",
+          });
+          return;
+        }
+        await actions.run("watch_remove", { address: args.trim().split(/\s+/)[0] });
+        await call("sendMessage", { chat_id: chatId, text: "<b>Wallet removed from watchlist.</b>", parse_mode: "HTML" });
+        await sendStatus(chatId);
       } else if (command === "/watchlist") {
         await call("sendMessage", {
           chat_id: chatId,
@@ -324,7 +350,7 @@ export function createTelegramService({
         await call("sendMessage", {
           chat_id: chatId,
           text:
-            `<b>Commands</b>\n/deploy [agent name]\n/register [agentURI]\n/groq gsk-... [model]\n/openai sk-... [model]\n/watch 0x...\n/watchlist\n/label Treasury Ops | treasury | high\n/policies\n/policy alert me if more than 10 MNT leaves\n/monitor\n/brief\n/proof\n/reset\n/redeploy${demoMode ? "\n/demo" : ""}`,
+            `<b>Commands</b>\n/deploy [agent name]\n/register [agentURI]\n/groq gsk-... [model]\n/openai sk-... [model]\n/watch 0x...\n/watch_add 0x... | Label | treasury | high\n/watch_remove 0x...\n/watchlist\n/label Treasury Ops | treasury | high\n/policies\n/policy alert me if more than 10 MNT leaves\n/monitor\n/brief\n/proof\n/reset\n/redeploy${demoMode ? "\n/demo" : ""}`,
           parse_mode: "HTML",
         });
       }
@@ -442,6 +468,8 @@ function commandsFor(demoMode: boolean): TelegramCommand[] {
     { command: "start", description: "Open MantSent and show current setup" },
     { command: "deploy", description: "Create and register an ERC-8004 agent" },
     { command: "watch", description: "Set the Mantle wallet to monitor" },
+    { command: "watch_add", description: "Add another labelled wallet" },
+    { command: "watch_remove", description: "Remove a watched wallet" },
     { command: "watchlist", description: "Show labelled wallet profile" },
     { command: "label", description: "Label the watched wallet for scoring" },
     { command: "policies", description: "Show supported policy examples" },
@@ -459,14 +487,15 @@ function commandsFor(demoMode: boolean): TelegramCommand[] {
 
 function watchlistText(state: PublicState): string {
   if (!state.watchedWallets.length) return "<b>Watchlist</b>\nNo wallet profile set. Use <code>/watch 0x...</code> first.";
-  const wallet = state.watchedWallets[0];
-  if (!wallet) return "<b>Watchlist</b>\nNo wallet profile set. Use <code>/watch 0x...</code> first.";
   return `<b>Watchlist</b>
-<b>${escapeHtml(wallet.label)}</b>
+${state.watchedWallets
+  .map(
+    (wallet, index) => `${index + 1}. <b>${escapeHtml(wallet.label)}</b>
 Address: <code>${escapeHtml(shortAddress(wallet.address))}</code>
-Category: ${escapeHtml(wallet.category)}
-Importance: ${escapeHtml(wallet.importance)}
-${wallet.notes ? `Notes: ${escapeHtml(wallet.notes)}` : "Notes: Not set"}`;
+Category: ${escapeHtml(wallet.category)} · ${escapeHtml(wallet.importance)}
+${wallet.notes ? `Notes: ${escapeHtml(wallet.notes)}` : "Notes: Not set"}`,
+  )
+  .join("\n\n")}`;
 }
 
 function briefText(state: PublicState): string {
@@ -479,7 +508,7 @@ function briefText(state: PublicState): string {
 ${escapeHtml(mantleProofTagline)}
 
 <b>Scope</b>
-Wallet: ${state.watchedWallet ? `<code>${escapeHtml(shortAddress(state.watchedWallet))}</code>` : "Not set"}
+Wallets: ${state.watchedWallets.length ? `${state.watchedWallets.length} watched` : "Not set"}
 Label: ${wallet ? escapeHtml(wallet.label) : "Not set"}
 Category: ${wallet ? `${escapeHtml(wallet.category)} · ${escapeHtml(wallet.importance)} importance` : "Not set"}
 Policy: ${state.policyActive ? escapeHtml(policySummary(state)) : "Not set"}
@@ -504,6 +533,17 @@ function parseWalletProfileArgs(args: string): { name: string; category: "treasu
     name: rawName || "Primary Mantle Wallet",
     category,
     importance,
+  };
+}
+
+function parseWatchAddArgs(args: string): { address: string; name: string; category: "treasury" | "whale" | "protocol" | "exchange" | "fresh" | "custom"; importance: "low" | "medium" | "high" } {
+  const [rawAddress, rawName, rawCategory, rawImportance] = args.split("|").map((part) => part.trim());
+  if (!rawAddress || !isWalletAddress(rawAddress)) throw new Error("Use /watch_add 0xWallet | Label | category | importance");
+  return {
+    address: rawAddress,
+    name: rawName || "Watched Mantle Wallet",
+    category: parseCategory(rawCategory),
+    importance: parseImportance(rawImportance),
   };
 }
 
@@ -547,7 +587,7 @@ ${setupProgress(state)}
 <code>#${escapeHtml(state.agentId)}</code> · ${state.agentIdentityStatus === "erc8004-registered" ? "ERC-8004" : "Local profile"} · ${aiLabel(state)}
 
 <b>Monitoring</b>
-Wallet: ${state.watchedWallet ? `<code>${escapeHtml(shortAddress(state.watchedWallet))}</code>` : "Not set"}
+Wallets: ${state.watchedWallets.length ? `${state.watchedWallets.length} watched` : "Not set"}
 Policy: ${state.policyActive ? escapeHtml(policySummary(state)) : "Not set"}
 Scope: ${state.policyActive ? escapeHtml(policyScope(state)) : "Not set"}
 Monitor: ${state.monitorActive ? "Live" : "Off"}${latest ? `

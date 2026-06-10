@@ -61,6 +61,9 @@ export async function buildIncident(input: {
   alertTxHash: string;
   decision: PolicyDecision;
   recipient: string;
+  watchedWallet?: string;
+  walletLabel?: string;
+  walletCategory?: "treasury" | "whale" | "protocol" | "exchange" | "fresh" | "custom";
   outflowAmountMnt: string;
   asset?: "MNT" | "ERC20";
   tokenSymbol?: string;
@@ -71,7 +74,6 @@ export async function buildIncident(input: {
   thresholdMnt: number;
   recentTransactionCount?: number;
   direction?: "incoming" | "outgoing";
-  walletCategory?: string;
   walletImportance?: "low" | "medium" | "high";
   hasWalletLabel?: boolean;
   feedbackExamples?: FeedbackExample[];
@@ -123,6 +125,9 @@ export async function buildIncident(input: {
     outcome: "Unresolved",
     createdAt: new Date().toISOString(),
     recipient: input.recipient,
+    watchedWallet: input.watchedWallet,
+    walletLabel: input.walletLabel,
+    walletCategory: input.walletCategory,
     outflowAmountMnt: input.outflowAmountMnt,
     asset: input.asset || "MNT",
     tokenSymbol: input.tokenSymbol,
