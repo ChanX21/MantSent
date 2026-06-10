@@ -236,6 +236,13 @@ export function createTelegramService({
           parse_mode: "HTML",
           disable_web_page_preview: true,
         });
+      } else if (command === "/brief") {
+        await call("sendMessage", {
+          chat_id: chatId,
+          text: briefText(actions.state()),
+          parse_mode: "HTML",
+          disable_web_page_preview: true,
+        });
       } else if (command === "/label") {
         if (!args) {
           await call("sendMessage", {
@@ -303,7 +310,7 @@ export function createTelegramService({
         await call("sendMessage", {
           chat_id: chatId,
           text:
-            `<b>Commands</b>\n/deploy [agent name]\n/create [agent name]\n/register [agentURI]\n/groq gsk-... [model]\n/openai sk-... [model]\n/watch 0x...\n/watchlist\n/label Treasury Ops | treasury | high\n/policy alert me if more than 10 MNT leaves\n/monitor\n/proof\n/reset\n/redeploy${demoMode ? "\n/demo" : ""}`,
+            `<b>Commands</b>\n/deploy [agent name]\n/create [agent name]\n/register [agentURI]\n/groq gsk-... [model]\n/openai sk-... [model]\n/watch 0x...\n/watchlist\n/label Treasury Ops | treasury | high\n/policy alert me if more than 10 MNT leaves\n/monitor\n/brief\n/proof\n/reset\n/redeploy${demoMode ? "\n/demo" : ""}`,
           parse_mode: "HTML",
         });
       }
@@ -409,7 +416,7 @@ function isAuthorizedChat(chatId: number, adminChats: Set<number>): boolean {
 }
 
 function isReadOnlyCommand(command?: string): boolean {
-  return !command || ["/start", "/proof", "/incidents", "/watchlist", "/help"].includes(command);
+  return !command || ["/start", "/proof", "/incidents", "/watchlist", "/brief", "/help"].includes(command);
 }
 
 function isReadOnlyCallback(action: string): boolean {
@@ -425,6 +432,7 @@ function commandsFor(demoMode: boolean): TelegramCommand[] {
     { command: "label", description: "Label the watched wallet for scoring" },
     { command: "policy", description: "Commit an alert policy on Mantle" },
     { command: "monitor", description: "Enable live Mantle wallet monitoring" },
+    { command: "brief", description: "Show current risk brief" },
     { command: "openai", description: "Add an OpenAI key for richer explanations" },
     { command: "groq", description: "Add a Groq key for richer explanations" },
     { command: "proof", description: "Show agent, policy, alert, and outcome proofs" },
@@ -444,6 +452,33 @@ Address: <code>${escapeHtml(shortAddress(wallet.address))}</code>
 Category: ${escapeHtml(wallet.category)}
 Importance: ${escapeHtml(wallet.importance)}
 ${wallet.notes ? `Notes: ${escapeHtml(wallet.notes)}` : "Notes: Not set"}`;
+}
+
+function briefText(state: PublicState): string {
+  const latest = state.incidents[0];
+  const wallet = state.watchedWallets[0];
+  const realSignals = state.incidents.filter((incident) => incident.source === "mantle-transaction").length;
+  const unresolved = state.incidents.filter((incident) => incident.outcome === "Unresolved").length;
+  const suspicious = state.incidents.filter((incident) => incident.outcome === "Suspicious Activity").length;
+  return `<b>MantSent Risk Brief</b>
+${escapeHtml(mantleProofTagline)}
+
+<b>Scope</b>
+Wallet: ${state.watchedWallet ? `<code>${escapeHtml(shortAddress(state.watchedWallet))}</code>` : "Not set"}
+Label: ${wallet ? escapeHtml(wallet.label) : "Not set"}
+Category: ${wallet ? `${escapeHtml(wallet.category)} · ${escapeHtml(wallet.importance)} importance` : "Not set"}
+Policy: ${state.policyActive ? escapeHtml(policySummary(state)) : "Not set"}
+Monitor: ${state.monitorActive ? "Live" : "Off"}
+
+<b>Signal posture</b>
+Total: ${state.incidents.length}
+Real Mantle tx: ${realSignals}
+Unresolved: ${unresolved}
+Suspicious: ${suspicious}
+
+<b>Latest signal</b>
+${latest ? `${escapeHtml(latest.signalType || "Policy Match")} · ${latest.signalScore ?? "Pending"}/100 · ${escapeHtml(latest.outcome)}
+Evidence: <code>${escapeHtml(shortAddress(latest.evidenceTxHash))}</code>` : "No incidents recorded"}`;
 }
 
 function parseWalletProfileArgs(args: string): { name: string; category: "treasury" | "whale" | "protocol" | "exchange" | "fresh" | "custom"; importance: "low" | "medium" | "high" } {
