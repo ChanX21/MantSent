@@ -19,7 +19,7 @@ const mime: Record<string, string> = {
   ".webp": "image/webp",
 };
 
-const staticAllowlist = new Set(["index.html", "app.js", "app.js.map", "styles.css", "favicon.ico", "favicon-32.png", "favicon.svg", "apple-touch-icon.png"]);
+const staticAllowlist = new Set(["index.html", "app.js", "app.js.map", "styles.css", "favicon.ico", "favicon.png", "favicon-32.png", "favicon.svg", "apple-touch-icon.png"]);
 
 export function createRequestHandler({ env, actions, telegram }: { env: RuntimeEnv; actions: ActionService; telegram: TelegramService }) {
   return async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
