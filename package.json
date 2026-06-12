@@ -13,8 +13,8 @@
     "env:check": "npm run build && node dist/scripts/check-env.js",
     "typecheck": "tsc --noEmit",
     "build": "npm run build:client && tsc",
-    "test": "npm run build && node dist/scripts/test-policy-parser.js && node dist/scripts/test-monitor-fixtures.js && node dist/scripts/test-client-analytics.js",
-    "check": "npm run build && npm run typecheck && node dist/scripts/test-policy-parser.js && node dist/scripts/test-monitor-fixtures.js && node dist/scripts/test-client-analytics.js"
+    "test": "npm run build && node dist/scripts/test-policy-parser.js && node dist/scripts/test-monitor-fixtures.js && node dist/scripts/test-client-analytics.js && node dist/scripts/test-client-render.js",
+    "check": "npm run build && npm run typecheck && node dist/scripts/test-policy-parser.js && node dist/scripts/test-monitor-fixtures.js && node dist/scripts/test-client-analytics.js && node dist/scripts/test-client-render.js"
   },
   "dependencies": {
     "ethers": "^6.14.4",

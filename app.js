@@ -191,24 +191,24 @@ var agent = {
 };
 function applyRemoteState(remote) {
   Object.assign(state, {
-    agentCreated: remote.agentCreated,
-    walletWatched: remote.walletWatched,
-    policyActive: remote.policyActive,
-    monitorActive: remote.monitorActive,
-    monitorLastCheckedAt: remote.monitorLastCheckedAt,
-    monitorLastBlock: remote.monitorLastBlock,
-    monitorLastError: remote.monitorLastError,
-    transferDetected: remote.transferDetected,
-    resolved: remote.resolved,
-    outcome: remote.outcome,
-    thresholdMnt: remote.thresholdMnt,
-    policy: remote.policy,
-    watchedWallets: remote.watchedWallets || [],
-    aiProvider: remote.aiProvider,
-    openAiConfigured: remote.openAiConfigured,
-    agentRegistrationTxHash: remote.agentRegistrationTxHash,
-    agentUri: remote.agentUri,
-    incidents: remote.incidents
+    agentCreated: Boolean(remote.agentCreated),
+    walletWatched: Boolean(remote.walletWatched),
+    policyActive: Boolean(remote.policyActive),
+    monitorActive: Boolean(remote.monitorActive),
+    monitorLastCheckedAt: remote.monitorLastCheckedAt || "",
+    monitorLastBlock: Number.isFinite(remote.monitorLastBlock) ? remote.monitorLastBlock : 0,
+    monitorLastError: remote.monitorLastError || "",
+    transferDetected: Boolean(remote.transferDetected),
+    resolved: Boolean(remote.resolved),
+    outcome: remote.outcome || "Unresolved",
+    thresholdMnt: Number.isFinite(remote.thresholdMnt) ? remote.thresholdMnt : 0,
+    policy: remote.policy || null,
+    watchedWallets: Array.isArray(remote.watchedWallets) ? remote.watchedWallets : [],
+    aiProvider: remote.aiProvider || "template",
+    openAiConfigured: Boolean(remote.openAiConfigured),
+    agentRegistrationTxHash: remote.agentRegistrationTxHash || "",
+    agentUri: remote.agentUri || "agent-metadata.json",
+    incidents: Array.isArray(remote.incidents) ? remote.incidents : []
   });
   Object.assign(agent, {
     id: remote.agentId || agent.id,
@@ -221,8 +221,8 @@ function applyRemoteState(remote) {
     policyTx: remote.policyTxHash || "",
     alertTx: remote.alertTxHash || "",
     outcomeTx: remote.outcomeTxHash || "",
-    evidenceSource: remote.evidenceSource,
-    identityStatus: remote.agentIdentityStatus
+    evidenceSource: remote.evidenceSource || "demo",
+    identityStatus: remote.agentIdentityStatus || "placeholder"
   });
 }
 function setupProgress() {
@@ -256,6 +256,18 @@ function short(hash) {
   if (!hash || hash.length < 18) return hash;
   return `${hash.slice(0, 10)}...${hash.slice(-8)}`;
 }
+function displayText(value, fallback = "Pending") {
+  if (value === null || value === void 0) return fallback;
+  if (typeof value === "number" && !Number.isFinite(value)) return fallback;
+  const text = String(value).trim();
+  return text ? text : fallback;
+}
+function escapeHtml(value, fallback = "Pending") {
+  return displayText(value, fallback).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+function shortDisplay(value, fallback = "Pending") {
+  return short(displayText(value, fallback));
+}
 function txLink(hash, label = short(hash)) {
   if (!hash) return "Pending";
   return `<a class="proof-link" href="${mantleTxUrl(hash)}" target="_blank" rel="noreferrer">${label}</a>`;
@@ -271,21 +283,21 @@ function alertCard(latest = state.incidents[0]) {
   const amount = incidentAmount(latest);
   const recipient = latest?.recipient || agent.recipient || "Pending";
   const evidence = latest?.evidenceTxHash || agent.tx;
-  const score = latest?.signalScore ?? 0;
+  const score = Number.isFinite(latest?.signalScore) ? latest?.signalScore : 0;
   const signalType = latest?.signalType || "Policy Match";
   const severity = latest?.signalSeverity ? latest.signalSeverity.toUpperCase() : latest?.severity || "HIGH";
   return `
     <div class="alert-card">
       <div class="alert-top">
-        <span>${signalType}</span>
+        <span>${escapeHtml(signalType)}</span>
         <strong>${score}/100</strong>
       </div>
-      <p>${severity} signal generated from the configured wallet policy and confirmed Mantle activity.</p>
+      <p>${escapeHtml(severity)} signal generated from the configured wallet policy and confirmed Mantle activity.</p>
       <div class="alert-facts">
-        <span>Amount ${amount}</span>
-        <span>Recipient ${recipient}</span>
-        <span>Policy ${state.policy?.transactionCountThreshold ? `${state.policy.transactionCountThreshold}+ tx burst` : state.policy?.triggerOnAnyTransaction ? "any outgoing transaction" : state.thresholdMnt <= 0 ? "any MNT outflow" : `>${state.thresholdMnt} MNT`}</span>
-        <span>Evidence ${short(evidence)}</span>
+        <span>Amount ${escapeHtml(amount)}</span>
+        <span>Recipient ${escapeHtml(recipient)}</span>
+        <span>Policy ${escapeHtml(policyLabel())}</span>
+        <span>Evidence ${escapeHtml(shortDisplay(evidence))}</span>
       </div>
     </div>
   `;
@@ -293,17 +305,17 @@ function alertCard(latest = state.incidents[0]) {
 function metric(label, value) {
   return `
     <div class="metric">
-      <span>${label}</span>
-      <strong>${value}</strong>
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
     </div>
   `;
 }
 function analyticsCard(title, value, detail, tone = "neutral") {
   return `
     <article class="analytics-card ${tone}">
-      <span>${title}</span>
-      <strong>${value}</strong>
-      <p>${detail}</p>
+      <span>${escapeHtml(title)}</span>
+      <strong>${escapeHtml(value)}</strong>
+      <p>${escapeHtml(detail)}</p>
     </article>
   `;
 }
@@ -332,7 +344,7 @@ function setupChecklist() {
     ([label, done]) => `
             <div class="setup-row ${done ? "done" : ""}">
               <span></span>
-              <strong>${label}</strong>
+              <strong>${escapeHtml(label)}</strong>
               <small>${done ? "Ready" : "Pending"}</small>
             </div>
           `
@@ -361,11 +373,11 @@ function signalTable(incidents) {
       ${incidents.map(
     (incident) => `
             <div class="signal-row">
-              <strong>${incident.signalType || incident.severity}</strong>
-              <span>${incident.signalScore ?? "Pending"}</span>
-              <span>${incident.outcome}</span>
-              <span>${incidentAmount(incident)}</span>
-              <code>${short(incident.evidenceTxHash)}</code>
+              <strong>${escapeHtml(incident.signalType || incident.severity, "Policy Match")}</strong>
+              <span>${escapeHtml(Number.isFinite(incident.signalScore) ? incident.signalScore : "Pending")}</span>
+              <span>${escapeHtml(incident.outcome, "Unresolved")}</span>
+              <span>${escapeHtml(incidentAmount(incident))}</span>
+              <code>${escapeHtml(shortDisplay(incident.evidenceTxHash))}</code>
             </div>
           `
   ).join("")}
@@ -386,9 +398,9 @@ function alphaRadar(summary) {
       ${rows.map(
     ([label, value, detail]) => `
             <div>
-              <span>${label}</span>
-              <strong>${value}</strong>
-              <small>${detail}</small>
+              <span>${escapeHtml(label)}</span>
+              <strong>${escapeHtml(value)}</strong>
+              <small>${escapeHtml(detail)}</small>
             </div>
           `
   ).join("")}
@@ -426,7 +438,7 @@ function signalTaxonomy(summary) {
   if (!rows.length) return `<div class="empty-state compact-empty"><strong>No taxonomy yet</strong><p>Signal categories appear after policy matches.</p></div>`;
   return `
     <div class="taxonomy-list">
-      ${rows.map((row) => `<div><span>${row.label}</span><strong>${row.count}</strong><small>${row.percent}%</small></div>`).join("")}
+      ${rows.map((row) => `<div><span>${escapeHtml(row.label)}</span><strong>${row.count}</strong><small>${row.percent}%</small></div>`).join("")}
     </div>
   `;
 }
@@ -439,7 +451,7 @@ function scoreDistribution(summary) {
     const width = Math.round(count / max * 100);
     return `
             <div>
-              <span>${labels[index]}</span>
+              <span>${escapeHtml(labels[index])}</span>
               <strong>${count}</strong>
               <i style="--fill:${width}%"></i>
             </div>
@@ -449,7 +461,7 @@ function scoreDistribution(summary) {
   `;
 }
 function concentrationPanel(summary) {
-  const topRecipient = summary.topRecipient ? `${short(summary.topRecipient.value)} (${summary.topRecipient.count})` : "None";
+  const topRecipient = summary.topRecipient ? `${shortDisplay(summary.topRecipient.value)} (${summary.topRecipient.count})` : "None";
   const topWallet = summary.topWallet ? `${summary.topWallet.value} (${summary.topWallet.count})` : "None";
   return `
     <div class="concentration-grid">
@@ -464,7 +476,7 @@ function reasonCodePanel(summary) {
   if (!summary.reasonCodeBreakdown.length) return `<div class="empty-state compact-empty"><strong>No reason-code stats</strong><p>Reason codes appear after evaluated policy matches.</p></div>`;
   return `
     <div class="taxonomy-list">
-      ${summary.reasonCodeBreakdown.map((row) => `<div><span>${row.label}</span><strong>${row.count}</strong><small>${row.percent}%</small></div>`).join("")}
+      ${summary.reasonCodeBreakdown.map((row) => `<div><span>${escapeHtml(row.label)}</span><strong>${row.count}</strong><small>${row.percent}%</small></div>`).join("")}
     </div>
   `;
 }
@@ -481,7 +493,7 @@ function proofTimeline() {
     ([label, done, txHash]) => `
             <div class="${done ? "done" : ""}">
               <span></span>
-              <strong>${label}</strong>
+              <strong>${escapeHtml(label)}</strong>
               <small>${done ? proofValue(txHash) : "Pending"}</small>
             </div>
           `
@@ -492,18 +504,24 @@ function proofTimeline() {
 function statusBadge(label, value, tone = "neutral") {
   return `
     <div class="status-badge ${tone}">
-      <span>${label}</span>
-      <strong>${value}</strong>
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
     </div>
   `;
 }
 function incidentAmount(incident) {
   if (!incident) return "Unknown";
   if (incident.asset === "ERC20") return `${incident.tokenAmount || "Unknown"} ${incident.tokenSymbol || "ERC20"}`;
-  return `${incident.outflowAmountMnt} MNT`;
+  return `${incident.outflowAmountMnt || "Unknown"} MNT`;
 }
 function formatNumber(value) {
   return new Intl.NumberFormat("en", { maximumFractionDigits: 2 }).format(value);
+}
+function policyLabel() {
+  if (state.policy?.transactionCountThreshold) return `${state.policy.transactionCountThreshold}+ tx burst`;
+  if (state.policy?.triggerOnAnyTransaction) return "any outgoing transaction";
+  if (state.thresholdMnt <= 0) return "any MNT outflow";
+  return `>${state.thresholdMnt} MNT`;
 }
 
 // src/client/views.ts
@@ -517,7 +535,7 @@ function analyticsDashboardView() {
     <main id="dashboard" class="analytics-dashboard">
       <section class="kpi-grid" aria-label="MantSent analytics summary">
         ${analyticsCard("Treasury monitor", state.monitorActive ? "Live" : "Off", monitorDetail(), state.monitorLastError ? "danger" : state.monitorActive ? "good" : "warn")}
-        ${analyticsCard("Watchlist", watchedWalletCount ? `${watchedWalletCount} wallets` : "Not set", walletProfile ? `${walletProfile.label} \xB7 ${walletProfile.category}` : "Use /watch or /watch_add in Telegram", watchedWalletCount ? "good" : "warn")}
+        ${analyticsCard("Watchlist", watchedWalletCount ? `${watchedWalletCount} wallets` : "Not set", walletProfile ? `${walletProfile.label || "Labelled wallet"} \xB7 ${walletProfile.category || "custom"}` : "Use /watch or /watch_add in Telegram", watchedWalletCount ? "good" : "warn")}
         ${analyticsCard("Policy", policyTitle(), state.policyActive ? policyDetail() : "Use /policy in Telegram", state.policyActive ? "good" : "warn")}
         ${analyticsCard("Investor signal", `${analytics.peakScore}/100`, analytics.totalSignals ? `Weighted risk ${analytics.weightedRiskScore}/100` : "Awaiting first signal", analytics.peakScore >= 80 ? "danger" : analytics.peakScore >= 60 ? "warn" : "neutral")}
         ${analyticsCard("Data coverage", `${analytics.realSignals} real`, `${analytics.erc20Signals} ERC-20 \xB7 ${analytics.nativeSignals} native`, analytics.realSignals ? "good" : "neutral")}
@@ -601,7 +619,7 @@ function analyticsDashboardView() {
           <div class="panel-head compact">
             <div>
               <span class="eyebrow">Agent</span>
-              <h2>${agent.name}</h2>
+              <h2>${escapeHtml(agent.name, "MantSent Agent")}</h2>
             </div>
           </div>
           <div class="status-stack">

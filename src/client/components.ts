@@ -1,5 +1,5 @@
 import { agent, state } from "./state.js";
-import { proofValue, short, txLink } from "./format.js";
+import { escapeHtml, proofValue, shortDisplay, txLink } from "./format.js";
 import type { AnalyticsSummary } from "./analytics.js";
 import type { PublicState } from "./types.js";
 
@@ -7,21 +7,21 @@ export function alertCard(latest = state.incidents[0]): string {
   const amount = incidentAmount(latest);
   const recipient = latest?.recipient || agent.recipient || "Pending";
   const evidence = latest?.evidenceTxHash || agent.tx;
-  const score = latest?.signalScore ?? 0;
+  const score = Number.isFinite(latest?.signalScore) ? latest?.signalScore : 0;
   const signalType = latest?.signalType || "Policy Match";
   const severity = latest?.signalSeverity ? latest.signalSeverity.toUpperCase() : latest?.severity || "HIGH";
   return `
     <div class="alert-card">
       <div class="alert-top">
-        <span>${signalType}</span>
+        <span>${escapeHtml(signalType)}</span>
         <strong>${score}/100</strong>
       </div>
-      <p>${severity} signal generated from the configured wallet policy and confirmed Mantle activity.</p>
+      <p>${escapeHtml(severity)} signal generated from the configured wallet policy and confirmed Mantle activity.</p>
       <div class="alert-facts">
-        <span>Amount ${amount}</span>
-        <span>Recipient ${recipient}</span>
-        <span>Policy ${state.policy?.transactionCountThreshold ? `${state.policy.transactionCountThreshold}+ tx burst` : state.policy?.triggerOnAnyTransaction ? "any outgoing transaction" : state.thresholdMnt <= 0 ? "any MNT outflow" : `>${state.thresholdMnt} MNT`}</span>
-        <span>Evidence ${short(evidence)}</span>
+        <span>Amount ${escapeHtml(amount)}</span>
+        <span>Recipient ${escapeHtml(recipient)}</span>
+        <span>Policy ${escapeHtml(policyLabel())}</span>
+        <span>Evidence ${escapeHtml(shortDisplay(evidence))}</span>
       </div>
     </div>
   `;
@@ -30,8 +30,8 @@ export function alertCard(latest = state.incidents[0]): string {
 export function metric(label: string, value: number | string): string {
   return `
     <div class="metric">
-      <span>${label}</span>
-      <strong>${value}</strong>
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
     </div>
   `;
 }
@@ -39,9 +39,9 @@ export function metric(label: string, value: number | string): string {
 export function analyticsCard(title: string, value: string, detail: string, tone: "good" | "warn" | "danger" | "neutral" = "neutral"): string {
   return `
     <article class="analytics-card ${tone}">
-      <span>${title}</span>
-      <strong>${value}</strong>
-      <p>${detail}</p>
+      <span>${escapeHtml(title)}</span>
+      <strong>${escapeHtml(value)}</strong>
+      <p>${escapeHtml(detail)}</p>
     </article>
   `;
 }
@@ -77,7 +77,7 @@ export function setupChecklist(): string {
           ([label, done]) => `
             <div class="setup-row ${done ? "done" : ""}">
               <span></span>
-              <strong>${label}</strong>
+              <strong>${escapeHtml(label)}</strong>
               <small>${done ? "Ready" : "Pending"}</small>
             </div>
           `,
@@ -110,11 +110,11 @@ export function signalTable(incidents: PublicState["incidents"]): string {
         .map(
           (incident) => `
             <div class="signal-row">
-              <strong>${incident.signalType || incident.severity}</strong>
-              <span>${incident.signalScore ?? "Pending"}</span>
-              <span>${incident.outcome}</span>
-              <span>${incidentAmount(incident)}</span>
-              <code>${short(incident.evidenceTxHash)}</code>
+              <strong>${escapeHtml(incident.signalType || incident.severity, "Policy Match")}</strong>
+              <span>${escapeHtml(Number.isFinite(incident.signalScore) ? incident.signalScore : "Pending")}</span>
+              <span>${escapeHtml(incident.outcome, "Unresolved")}</span>
+              <span>${escapeHtml(incidentAmount(incident))}</span>
+              <code>${escapeHtml(shortDisplay(incident.evidenceTxHash))}</code>
             </div>
           `,
         )
@@ -139,9 +139,9 @@ export function alphaRadar(summary: AnalyticsSummary): string {
         .map(
           ([label, value, detail]) => `
             <div>
-              <span>${label}</span>
-              <strong>${value}</strong>
-              <small>${detail}</small>
+              <span>${escapeHtml(label)}</span>
+              <strong>${escapeHtml(value)}</strong>
+              <small>${escapeHtml(detail)}</small>
             </div>
           `,
         )
@@ -182,7 +182,7 @@ export function signalTaxonomy(summary: AnalyticsSummary): string {
   if (!rows.length) return `<div class="empty-state compact-empty"><strong>No taxonomy yet</strong><p>Signal categories appear after policy matches.</p></div>`;
   return `
     <div class="taxonomy-list">
-      ${rows.map((row) => `<div><span>${row.label}</span><strong>${row.count}</strong><small>${row.percent}%</small></div>`).join("")}
+      ${rows.map((row) => `<div><span>${escapeHtml(row.label)}</span><strong>${row.count}</strong><small>${row.percent}%</small></div>`).join("")}
     </div>
   `;
 }
@@ -197,7 +197,7 @@ export function scoreDistribution(summary: AnalyticsSummary): string {
           const width = Math.round((count / max) * 100);
           return `
             <div>
-              <span>${labels[index]}</span>
+              <span>${escapeHtml(labels[index])}</span>
               <strong>${count}</strong>
               <i style="--fill:${width}%"></i>
             </div>
@@ -209,7 +209,7 @@ export function scoreDistribution(summary: AnalyticsSummary): string {
 }
 
 export function concentrationPanel(summary: AnalyticsSummary): string {
-  const topRecipient = summary.topRecipient ? `${short(summary.topRecipient.value)} (${summary.topRecipient.count})` : "None";
+  const topRecipient = summary.topRecipient ? `${shortDisplay(summary.topRecipient.value)} (${summary.topRecipient.count})` : "None";
   const topWallet = summary.topWallet ? `${summary.topWallet.value} (${summary.topWallet.count})` : "None";
   return `
     <div class="concentration-grid">
@@ -225,7 +225,7 @@ export function reasonCodePanel(summary: AnalyticsSummary): string {
   if (!summary.reasonCodeBreakdown.length) return `<div class="empty-state compact-empty"><strong>No reason-code stats</strong><p>Reason codes appear after evaluated policy matches.</p></div>`;
   return `
     <div class="taxonomy-list">
-      ${summary.reasonCodeBreakdown.map((row) => `<div><span>${row.label}</span><strong>${row.count}</strong><small>${row.percent}%</small></div>`).join("")}
+      ${summary.reasonCodeBreakdown.map((row) => `<div><span>${escapeHtml(row.label)}</span><strong>${row.count}</strong><small>${row.percent}%</small></div>`).join("")}
     </div>
   `;
 }
@@ -245,7 +245,7 @@ export function proofTimeline(): string {
           ([label, done, txHash]) => `
             <div class="${done ? "done" : ""}">
               <span></span>
-              <strong>${label}</strong>
+              <strong>${escapeHtml(label)}</strong>
               <small>${done ? proofValue(txHash) : "Pending"}</small>
             </div>
           `,
@@ -258,8 +258,8 @@ export function proofTimeline(): string {
 export function statusBadge(label: string, value: string, tone: "good" | "warn" | "neutral" = "neutral"): string {
   return `
     <div class="status-badge ${tone}">
-      <span>${label}</span>
-      <strong>${value}</strong>
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
     </div>
   `;
 }
@@ -267,9 +267,9 @@ export function statusBadge(label: string, value: string, tone: "good" | "warn" 
 export function proofCard(title: string, label: string, done: boolean, value: string, linked = true): string {
   return `
     <article class="proof-card ${done ? "done" : ""}">
-      <span>${title}</span>
-      <h3>${label}</h3>
-      <code>${done ? (linked ? proofValue(value) : value) : "Pending"}</code>
+      <span>${escapeHtml(title)}</span>
+      <h3>${escapeHtml(label)}</h3>
+      <code>${done ? (linked ? proofValue(value) : escapeHtml(value)) : "Pending"}</code>
     </article>
   `;
 }
@@ -281,9 +281,16 @@ export function proofMeta(label: string, txHash: string): string {
 function incidentAmount(incident?: PublicState["incidents"][number]): string {
   if (!incident) return "Unknown";
   if (incident.asset === "ERC20") return `${incident.tokenAmount || "Unknown"} ${incident.tokenSymbol || "ERC20"}`;
-  return `${incident.outflowAmountMnt} MNT`;
+  return `${incident.outflowAmountMnt || "Unknown"} MNT`;
 }
 
 function formatNumber(value: number): string {
   return new Intl.NumberFormat("en", { maximumFractionDigits: 2 }).format(value);
+}
+
+function policyLabel(): string {
+  if (state.policy?.transactionCountThreshold) return `${state.policy.transactionCountThreshold}+ tx burst`;
+  if (state.policy?.triggerOnAnyTransaction) return "any outgoing transaction";
+  if (state.thresholdMnt <= 0) return "any MNT outflow";
+  return `>${state.thresholdMnt} MNT`;
 }

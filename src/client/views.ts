@@ -15,7 +15,7 @@ import {
   sparkBars,
   statusBadge,
 } from "./components.js";
-import { cls, short } from "./format.js";
+import { cls, escapeHtml } from "./format.js";
 import { agent, setupProgress, state } from "./state.js";
 import type { AnalyticsSummary } from "./analytics.js";
 
@@ -30,7 +30,7 @@ export function analyticsDashboardView(): string {
     <main id="dashboard" class="analytics-dashboard">
       <section class="kpi-grid" aria-label="MantSent analytics summary">
         ${analyticsCard("Treasury monitor", state.monitorActive ? "Live" : "Off", monitorDetail(), state.monitorLastError ? "danger" : state.monitorActive ? "good" : "warn")}
-        ${analyticsCard("Watchlist", watchedWalletCount ? `${watchedWalletCount} wallets` : "Not set", walletProfile ? `${walletProfile.label} · ${walletProfile.category}` : "Use /watch or /watch_add in Telegram", watchedWalletCount ? "good" : "warn")}
+        ${analyticsCard("Watchlist", watchedWalletCount ? `${watchedWalletCount} wallets` : "Not set", walletProfile ? `${walletProfile.label || "Labelled wallet"} · ${walletProfile.category || "custom"}` : "Use /watch or /watch_add in Telegram", watchedWalletCount ? "good" : "warn")}
         ${analyticsCard("Policy", policyTitle(), state.policyActive ? policyDetail() : "Use /policy in Telegram", state.policyActive ? "good" : "warn")}
         ${analyticsCard("Investor signal", `${analytics.peakScore}/100`, analytics.totalSignals ? `Weighted risk ${analytics.weightedRiskScore}/100` : "Awaiting first signal", analytics.peakScore >= 80 ? "danger" : analytics.peakScore >= 60 ? "warn" : "neutral")}
         ${analyticsCard("Data coverage", `${analytics.realSignals} real`, `${analytics.erc20Signals} ERC-20 · ${analytics.nativeSignals} native`, analytics.realSignals ? "good" : "neutral")}
@@ -114,7 +114,7 @@ export function analyticsDashboardView(): string {
           <div class="panel-head compact">
             <div>
               <span class="eyebrow">Agent</span>
-              <h2>${agent.name}</h2>
+              <h2>${escapeHtml(agent.name, "MantSent Agent")}</h2>
             </div>
           </div>
           <div class="status-stack">

@@ -79,24 +79,24 @@ export const steps: StepViewModel[] = [
 
 export function applyRemoteState(remote: PublicState): void {
   Object.assign(state, {
-    agentCreated: remote.agentCreated,
-    walletWatched: remote.walletWatched,
-    policyActive: remote.policyActive,
-    monitorActive: remote.monitorActive,
-    monitorLastCheckedAt: remote.monitorLastCheckedAt,
-    monitorLastBlock: remote.monitorLastBlock,
-    monitorLastError: remote.monitorLastError,
-    transferDetected: remote.transferDetected,
-    resolved: remote.resolved,
-    outcome: remote.outcome,
-    thresholdMnt: remote.thresholdMnt,
-    policy: remote.policy,
-    watchedWallets: remote.watchedWallets || [],
-    aiProvider: remote.aiProvider,
-    openAiConfigured: remote.openAiConfigured,
-    agentRegistrationTxHash: remote.agentRegistrationTxHash,
-    agentUri: remote.agentUri,
-    incidents: remote.incidents,
+    agentCreated: Boolean(remote.agentCreated),
+    walletWatched: Boolean(remote.walletWatched),
+    policyActive: Boolean(remote.policyActive),
+    monitorActive: Boolean(remote.monitorActive),
+    monitorLastCheckedAt: remote.monitorLastCheckedAt || "",
+    monitorLastBlock: Number.isFinite(remote.monitorLastBlock) ? remote.monitorLastBlock : 0,
+    monitorLastError: remote.monitorLastError || "",
+    transferDetected: Boolean(remote.transferDetected),
+    resolved: Boolean(remote.resolved),
+    outcome: remote.outcome || "Unresolved",
+    thresholdMnt: Number.isFinite(remote.thresholdMnt) ? remote.thresholdMnt : 0,
+    policy: remote.policy || null,
+    watchedWallets: Array.isArray(remote.watchedWallets) ? remote.watchedWallets : [],
+    aiProvider: remote.aiProvider || "template",
+    openAiConfigured: Boolean(remote.openAiConfigured),
+    agentRegistrationTxHash: remote.agentRegistrationTxHash || "",
+    agentUri: remote.agentUri || "agent-metadata.json",
+    incidents: Array.isArray(remote.incidents) ? remote.incidents : [],
   });
   Object.assign(agent, {
     id: remote.agentId || agent.id,
@@ -109,8 +109,8 @@ export function applyRemoteState(remote: PublicState): void {
     policyTx: remote.policyTxHash || "",
     alertTx: remote.alertTxHash || "",
     outcomeTx: remote.outcomeTxHash || "",
-    evidenceSource: remote.evidenceSource,
-    identityStatus: remote.agentIdentityStatus,
+    evidenceSource: remote.evidenceSource || "demo",
+    identityStatus: remote.agentIdentityStatus || "placeholder",
   });
 }
 
