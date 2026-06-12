@@ -4,6 +4,9 @@ var state = {
   walletWatched: false,
   policyActive: false,
   monitorActive: false,
+  monitorLastCheckedAt: "",
+  monitorLastBlock: 0,
+  monitorLastError: "",
   transferDetected: false,
   resolved: false,
   outcome: "Unresolved",
@@ -38,6 +41,9 @@ function applyRemoteState(remote) {
     walletWatched: remote.walletWatched,
     policyActive: remote.policyActive,
     monitorActive: remote.monitorActive,
+    monitorLastCheckedAt: remote.monitorLastCheckedAt,
+    monitorLastBlock: remote.monitorLastBlock,
+    monitorLastError: remote.monitorLastError,
     transferDetected: remote.transferDetected,
     resolved: remote.resolved,
     outcome: remote.outcome,
@@ -328,7 +334,7 @@ function analyticsDashboardView() {
   return `
     <main id="dashboard" class="analytics-dashboard">
       <section class="kpi-grid" aria-label="MantSent analytics summary">
-        ${analyticsCard("Treasury monitor", state.monitorActive ? "Live" : "Off", state.monitorActive ? "Polling Mantle wallet and token flow" : "Start monitoring from Telegram", state.monitorActive ? "good" : "warn")}
+        ${analyticsCard("Treasury monitor", state.monitorActive ? "Live" : "Off", monitorDetail(), state.monitorLastError ? "danger" : state.monitorActive ? "good" : "warn")}
         ${analyticsCard("Watchlist", watchedWalletCount ? `${watchedWalletCount} wallets` : "Not set", walletProfile ? `${walletProfile.label} \xB7 ${walletProfile.category}` : "Use /watch or /watch_add in Telegram", watchedWalletCount ? "good" : "warn")}
         ${analyticsCard("Policy", policyTitle(), state.policyActive ? policyDetail() : "Use /policy in Telegram", state.policyActive ? "good" : "warn")}
         ${analyticsCard("Investor signal", `${maxSignalScore}/100`, alerts ? "Peak scored Mantle signal" : "Awaiting first signal", maxSignalScore >= 80 ? "danger" : maxSignalScore >= 60 ? "warn" : "neutral")}
@@ -409,6 +415,7 @@ function analyticsDashboardView() {
             ${statusBadge("Agent ID", `#${agent.id}`, state.agentCreated ? "good" : "warn")}
             ${statusBadge("Identity", agent.identityStatus === "erc8004-registered" ? "ERC-8004 registered" : "Local profile", agent.identityStatus === "erc8004-registered" ? "good" : "warn")}
             ${statusBadge("AI", aiLabel(), state.openAiConfigured ? "good" : "neutral")}
+            ${statusBadge("Monitor health", state.monitorLastError ? "Error" : state.monitorLastCheckedAt ? "Fresh" : "Pending", state.monitorLastError ? "warn" : state.monitorLastCheckedAt ? "good" : "neutral")}
           </div>
         </article>
 
@@ -505,6 +512,11 @@ function policyDetail() {
   if (!state.policy) return "Policy active";
   const direction = state.policy.direction && state.policy.direction !== "both" ? `${state.policy.direction} only` : "incoming and outgoing";
   return state.policy.rawText ? `${state.policy.rawText} (${direction})` : state.policy.escalateNewRecipient ? `Escalate new recipients (${direction})` : `Threshold rule (${direction})`;
+}
+function monitorDetail() {
+  if (state.monitorLastError) return `Last error: ${state.monitorLastError}`;
+  if (state.monitorLastBlock) return `Last scanned block ${state.monitorLastBlock}`;
+  return state.monitorActive ? "Polling Mantle wallet and token flow" : "Start monitoring from Telegram";
 }
 
 // src/shared/branding.ts

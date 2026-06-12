@@ -144,6 +144,9 @@ function watchWallet(env: RuntimeEnv, payload: ActionPayload): AppState {
     state.lastAlertHash = "";
     state.monitorActive = false;
     state.monitorCursorBlock = 0;
+    state.monitorLastCheckedAt = "";
+    state.monitorLastBlock = 0;
+    state.monitorLastError = "";
     state.seenRecipients = [];
     state.recentTransactions = [];
     state.lastFrequencyAlertAt = 0;
@@ -337,6 +340,9 @@ function resetDemo(env: RuntimeEnv): AppState {
       lastAlertHash: "",
       monitorActive: false,
       monitorCursorBlock: 0,
+      monitorLastCheckedAt: "",
+      monitorLastBlock: 0,
+      monitorLastError: "",
       seenRecipients: [],
       recentTransactions: [],
       lastFrequencyAlertAt: 0,

@@ -148,6 +148,9 @@ export interface AppState {
   outcomeTxHash: string;
   lastAlertHash: string;
   monitorCursorBlock: number;
+  monitorLastCheckedAt: string;
+  monitorLastBlock: number;
+  monitorLastError: string;
   seenRecipients: string[];
   recentTransactions: Array<{ hash: string; timestamp: number }>;
   lastFrequencyAlertAt: number;

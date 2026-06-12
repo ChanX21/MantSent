@@ -34,14 +34,26 @@ export function startMantleMonitor(env: RuntimeEnv, onIncident?: (incident: Inci
 
     mutateState((current) => {
       current.monitorCursorBlock = Math.max(current.monitorCursorBlock, toBlock);
+      current.monitorLastBlock = Math.max(current.monitorLastBlock || 0, toBlock);
+      current.monitorLastCheckedAt = new Date().toISOString();
+      current.monitorLastError = "";
     });
   }
 
   setInterval(() => {
-    tick().catch((error) => console.error(`Mantle monitor error: ${(error as Error).message}`));
+    tick().catch((error) => recordMonitorError(error));
   }, pollIntervalMs);
 
-  tick().catch((error) => console.error(`Mantle monitor error: ${(error as Error).message}`));
+  tick().catch((error) => recordMonitorError(error));
+}
+
+function recordMonitorError(error: unknown): void {
+  const message = (error as Error).message || "Unknown monitor error";
+  console.error(`Mantle monitor error: ${message}`);
+  mutateState((current) => {
+    current.monitorLastCheckedAt = new Date().toISOString();
+    current.monitorLastError = message;
+  });
 }
 
 async function scanBlock(env: RuntimeEnv, blockNumber: number, onIncident?: (incident: Incident) => Promise<void> | void): Promise<void> {

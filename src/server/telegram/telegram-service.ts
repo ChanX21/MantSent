@@ -590,7 +590,8 @@ ${setupProgress(state)}
 Wallets: ${state.watchedWallets.length ? `${state.watchedWallets.length} watched` : "Not set"}
 Policy: ${state.policyActive ? escapeHtml(policySummary(state)) : "Not set"}
 Scope: ${state.policyActive ? escapeHtml(policyScope(state)) : "Not set"}
-Monitor: ${state.monitorActive ? "Live" : "Off"}${latest ? `
+Monitor: ${state.monitorActive ? "Live" : "Off"}
+Health: ${escapeHtml(monitorHealth(state))}${latest ? `
 
 <b>Latest signal</b>
 ${escapeHtml(latest.signalType || "Policy Match")} · ${escapeHtml(signalSeverityLabel(latest.signalSeverity, latest.severity))} · ${escapeHtml(latest.outcome)}
@@ -643,6 +644,13 @@ function aiLabel(state: PublicState): string {
   if (state.aiProvider === "groq" && state.openAiConfigured) return "Groq";
   if (state.aiProvider === "ollama" && state.openAiConfigured) return "Ollama";
   return escapeHtml(state.aiProvider);
+}
+
+function monitorHealth(state: PublicState): string {
+  if (state.monitorLastError) return `error - ${state.monitorLastError}`;
+  if (state.monitorLastBlock) return `last block ${state.monitorLastBlock}`;
+  if (state.monitorActive) return "waiting for first scan";
+  return "not running";
 }
 
 function signalSeverityLabel(signalSeverity: string | undefined, fallback: string): string {

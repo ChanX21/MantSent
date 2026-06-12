@@ -5,6 +5,9 @@ export interface ClientState {
   walletWatched: boolean;
   policyActive: boolean;
   monitorActive: boolean;
+  monitorLastCheckedAt: string;
+  monitorLastBlock: number;
+  monitorLastError: string;
   transferDetected: boolean;
   resolved: boolean;
   outcome: PublicState["outcome"];

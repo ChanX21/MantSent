@@ -32,6 +32,9 @@ const defaultState: AppState = {
   outcomeTxHash: "",
   lastAlertHash: "",
   monitorCursorBlock: 0,
+  monitorLastCheckedAt: "",
+  monitorLastBlock: 0,
+  monitorLastError: "",
   seenRecipients: [],
   recentTransactions: [],
   lastFrequencyAlertAt: 0,
@@ -48,6 +51,9 @@ export function loadState(path = statePath): AppState {
   loaded.aiProvider ||= "template";
   loaded.openAiConfigured ||= false;
   loaded.recentTransactions ||= [];
+  loaded.monitorLastCheckedAt ||= "";
+  loaded.monitorLastBlock ||= 0;
+  loaded.monitorLastError ||= "";
   loaded.lastFrequencyAlertAt ||= 0;
   loaded.feedbackExamples ||= [];
   loaded.watchedWallets ||= legacyWatchedWallets(loaded);
@@ -92,6 +98,9 @@ function sanitizeLegacyDemoState(state: AppState): void {
     outcomeTxHash: "",
     lastAlertHash: "",
     monitorCursorBlock: 0,
+    monitorLastCheckedAt: "",
+    monitorLastBlock: 0,
+    monitorLastError: "",
     seenRecipients: [],
     recentTransactions: [],
     lastFrequencyAlertAt: 0,
