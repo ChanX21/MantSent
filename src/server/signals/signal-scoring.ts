@@ -1,3 +1,4 @@
+import type { FeedbackExample } from "../../shared/types.js";
 import type { InvestorRelevance, MantleSignalSeverity, MantleSignalSource, SignalConfidence } from "./signal-types.js";
 
 export interface SignalScoreInput {
@@ -11,6 +12,7 @@ export interface SignalScoreInput {
   isBurstWindow?: boolean;
   reasonCodes?: string[];
   hasWalletLabel?: boolean;
+  feedbackExamples?: FeedbackExample[];
 }
 
 export interface SignalScoreResult {
@@ -47,14 +49,33 @@ export function scoreMantleSignal(input: SignalScoreInput): SignalScoreResult {
   else if (input.walletImportance === "medium") score += 5;
 
   if (input.isBurstWindow || input.reasonCodes?.includes("TRANSACTION_FREQUENCY")) score += 15;
+  score += feedbackAdjustment(input.feedbackExamples, input.reasonCodes, input.source);
 
-  const capped = Math.min(100, score);
+  const capped = Math.max(0, Math.min(100, score));
   return {
     score: capped,
     severity: severityFor(capped),
     investorRelevance: relevanceFor(capped, category, input.source),
     confidence: confidenceFor(input.hasWalletLabel, input.reasonCodes),
   };
+}
+
+function feedbackAdjustment(
+  examples: FeedbackExample[] | undefined,
+  reasonCodes: string[] | undefined,
+  source: MantleSignalSource,
+): number {
+  if (!examples?.length || !reasonCodes?.length) return 0;
+  const relevant = examples
+    .filter((example) => example.source === "mantle-transaction")
+    .filter((example) => example.reasonCodes.some((code) => reasonCodes.includes(code)))
+    .slice(0, 10);
+  if (!relevant.length) return 0;
+
+  const suspicious = relevant.filter((example) => example.outcome === "Suspicious Activity").length;
+  const expected = relevant.filter((example) => example.outcome === "Expected Transfer").length;
+  const sourceWeight = source === "contract_interaction" || source === "burst_window" ? 1.2 : 1;
+  return Math.round(Math.max(-10, Math.min(12, (suspicious * 3 - expected * 2) * sourceWeight)));
 }
 
 function severityFor(score: number): MantleSignalSeverity {

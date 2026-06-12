@@ -94,6 +94,7 @@ export async function buildIncident(input: {
     isBurstWindow: source === "burst_window",
     reasonCodes: input.decision.reasonCodes,
     hasWalletLabel: input.hasWalletLabel,
+    feedbackExamples: input.feedbackExamples,
   });
   const explanationInput = {
     amountMnt: input.outflowAmountMnt,
