@@ -1,6 +1,18 @@
 <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
-  <title id="title">MantSent favicon</title>
-  <rect width="64" height="64" rx="14" fill="#8FF5C8"/>
-  <path d="M16 51V13h9l7 14 7-14h9v38H39V30l-7 13-7-13v21h-9Z" fill="#050806"/>
-  <circle cx="32" cy="16" r="5" fill="#050806"/>
+  <title id="title">MantSent Mantle favicon</title>
+  <rect width="64" height="64" rx="12" fill="#050806"/>
+  <circle cx="32" cy="32" r="24" fill="#F7FFF9"/>
+  <path d="M31.3 13.5h1.4v13.9h-1.4V13.5Z" fill="#050806"/>
+  <path d="M21.8 17.1 23 16.4l7 12-1.2.7-7-12Z" fill="#050806"/>
+  <path d="M14.7 24.4 15.4 23l12.1 6.9-.7 1.3-12.1-6.8Z" fill="#050806"/>
+  <path d="M12.2 34.8v-1.5h14v1.5h-14Z" fill="#050806"/>
+  <path d="m15.4 45.2-.7-1.3 12.1-7 .7 1.3-12.1 7Z" fill="#050806"/>
+  <path d="m23 51.8-1.2-.8 7-12 1.2.7-7 12.1Z" fill="#050806"/>
+  <path d="M32.7 53.5h-1.4V39.6h1.4v13.9Z" fill="#050806"/>
+  <path d="m42.2 49.9-1.2.7-7-12 1.2-.7 7 12Z" fill="#050806"/>
+  <path d="m49.3 42.6-.7 1.3-12.1-6.9.7-1.3 12.1 6.9Z" fill="#050806"/>
+  <path d="M51.8 32.2v1.5h-14v-1.5h14Z" fill="#050806"/>
+  <path d="m48.6 21.8.7 1.3-12.1 7-.7-1.3 12.1-7Z" fill="#050806"/>
+  <path d="m41 15.2 1.2.8-7 12-1.2-.7 7-12.1Z" fill="#050806"/>
+  <circle cx="32" cy="32" r="5.5" fill="#050806"/>
 </svg>
