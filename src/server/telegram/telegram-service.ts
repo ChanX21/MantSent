@@ -144,7 +144,14 @@ export function createTelegramService({
       return;
     }
 
-    if (action === "watch_demo" && demoMode) await actions.run("watch", { address: demoWallet });
+    if (["create", "change_wallet", "reset", "redeploy_agent"].includes(action)) {
+      await call("sendMessage", {
+        chat_id: chatId,
+        text: "<b>This inline action has been retired.</b>\nUse commands directly: <code>/deploy</code>, <code>/watch</code>, or <code>/reset</code>.",
+        parse_mode: "HTML",
+      });
+    }
+    else if (action === "watch_demo" && demoMode) await actions.run("watch", { address: demoWallet });
     else if (action === "policy_demo" && demoMode) await actions.run("policy", { text: demoPolicy });
     else if (action === "transfer_demo" && demoMode) await actions.run("transfer", {});
     else if (action === "monitor_on") await actions.run("monitor", {});
@@ -155,17 +162,6 @@ export function createTelegramService({
     }
     else if (action === "wallet_setup") {
       await call("sendMessage", { chat_id: chatId, text: setupText, parse_mode: "HTML" });
-    }
-    else if (action === "change_wallet") {
-      await actions.run("reset");
-      await call("sendMessage", {
-        chat_id: chatId,
-        text: `<b>Wallet setup reset.</b>\n${setupText}`,
-        parse_mode: "HTML",
-      });
-    } else if (action === "redeploy_agent") {
-      await actions.run("reset");
-      await actions.run("create");
     }
     else if (action === "proof") await sendStatus(chatId);
     else await actions.run(action as ActionName, {});
