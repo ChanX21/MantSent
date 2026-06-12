@@ -684,13 +684,11 @@ function buttonsFor(state: PublicState, chainId?: string, demoMode = false): Inl
     return [
       [{ text: "Register ERC-8004 Agent", callback_data: "register_agent" }],
       [{ text: "Add AI Key", callback_data: "ai_setup" }],
-      managementButtons(),
     ];
   }
   if (!state.walletWatched) {
     const rows: InlineKeyboard = [
       [{ text: "Add AI Key", callback_data: "ai_setup" }],
-      managementButtons(),
     ];
     if (demoMode) rows.splice(1, 0, [{ text: "Use Demo Wallet", callback_data: "watch_demo" }]);
     return rows;
@@ -698,7 +696,6 @@ function buttonsFor(state: PublicState, chainId?: string, demoMode = false): Inl
   if (!state.policyActive) {
     const rows: InlineKeyboard = [
       [{ text: "How to Set Policy", callback_data: "wallet_setup" }],
-      managementButtons(),
     ];
     if (demoMode) rows.splice(1, 0, [{ text: "Use Sample Policy", callback_data: "policy_demo" }]);
     return rows;
@@ -706,22 +703,19 @@ function buttonsFor(state: PublicState, chainId?: string, demoMode = false): Inl
   if (!state.monitorActive) {
     const rows: InlineKeyboard = [
       [{ text: "Enable Live Monitor", callback_data: "monitor_on" }],
-      managementButtons(),
     ];
     if (demoMode) rows.splice(1, 0, [{ text: "Run Demo Outflow", callback_data: "transfer_demo" }]);
     return rows;
   }
   if (!state.transferDetected) {
-    return demoMode ? [[{ text: "Run Demo Outflow", callback_data: "transfer_demo" }], managementButtons()] : [managementButtons()];
+    return demoMode ? [[{ text: "Run Demo Outflow", callback_data: "transfer_demo" }]] : [];
   }
-  const rows: InlineKeyboard = [
+  return [
     [
       { text: "Expected Transfer", callback_data: "expected" },
       { text: "Suspicious Activity", callback_data: "suspicious" },
     ],
   ];
-  rows.push(managementButtons());
-  return rows;
 }
 
 function setupProgress(state: PublicState): string {
@@ -748,12 +742,4 @@ function nextStep(state: PublicState): string {
 function shortAddress(address: string): string {
   if (address.length < 18) return address;
   return `${address.slice(0, 8)}...${address.slice(-6)}`;
-}
-
-function managementButtons(): InlineButton[] {
-  return [
-    { text: "Change Wallet", callback_data: "change_wallet" },
-    { text: "Restart", callback_data: "reset" },
-    { text: "New Agent", callback_data: "redeploy_agent" },
-  ];
 }
