@@ -676,9 +676,7 @@ function formatTelegramExplanation(value: string): string {
 
 function buttonsFor(state: PublicState, chainId?: string, demoMode = false): InlineKeyboard {
   if (!state.agentCreated) {
-    return [
-      [{ text: "Deploy & Register Agent", callback_data: "deploy_agent" }],
-    ];
+    return [];
   }
   if (state.agentIdentityStatus !== "erc8004-registered") {
     return [
