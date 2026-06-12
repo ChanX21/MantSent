@@ -1,15 +1,28 @@
-import { alertCard, alphaRadar, analyticsCard, dataCoverage, metric, proofTimeline, setupChecklist, signalTable, signalTaxonomy, sparkBars, statusBadge } from "./components.js";
+import { createAnalyticsSummary, sortedIncidents } from "./analytics.js";
+import {
+  alertCard,
+  alphaRadar,
+  analyticsCard,
+  concentrationPanel,
+  dataCoverage,
+  metric,
+  proofTimeline,
+  reasonCodePanel,
+  scoreDistribution,
+  setupChecklist,
+  signalTable,
+  signalTaxonomy,
+  sparkBars,
+  statusBadge,
+} from "./components.js";
 import { cls, short } from "./format.js";
 import { agent, setupProgress, state } from "./state.js";
+import type { AnalyticsSummary } from "./analytics.js";
 
 export function analyticsDashboardView(): string {
-  const alerts = state.incidents.length;
-  const unresolved = state.incidents.filter((incident) => incident.outcome === "Unresolved").length;
-  const suspicious = state.incidents.filter((incident) => incident.outcome === "Suspicious Activity").length;
-  const realSignals = state.incidents.filter((incident) => incident.source === "mantle-transaction").length;
-  const tokenSignals = state.incidents.filter((incident) => incident.asset === "ERC20").length;
-  const maxSignalScore = Math.max(0, ...state.incidents.map((incident) => incident.signalScore || 0));
-  const latest = state.incidents[0];
+  const analytics = createAnalyticsSummary(state);
+  const incidents = sortedIncidents(state.incidents);
+  const latest = analytics.latestIncident;
   const walletProfile = state.watchedWallets[0];
   const watchedWalletCount = state.watchedWallets.length;
 
@@ -19,8 +32,9 @@ export function analyticsDashboardView(): string {
         ${analyticsCard("Treasury monitor", state.monitorActive ? "Live" : "Off", monitorDetail(), state.monitorLastError ? "danger" : state.monitorActive ? "good" : "warn")}
         ${analyticsCard("Watchlist", watchedWalletCount ? `${watchedWalletCount} wallets` : "Not set", walletProfile ? `${walletProfile.label} · ${walletProfile.category}` : "Use /watch or /watch_add in Telegram", watchedWalletCount ? "good" : "warn")}
         ${analyticsCard("Policy", policyTitle(), state.policyActive ? policyDetail() : "Use /policy in Telegram", state.policyActive ? "good" : "warn")}
-        ${analyticsCard("Investor signal", `${maxSignalScore}/100`, alerts ? "Peak scored Mantle signal" : "Awaiting first signal", maxSignalScore >= 80 ? "danger" : maxSignalScore >= 60 ? "warn" : "neutral")}
-        ${analyticsCard("Data coverage", `${realSignals} real`, `${tokenSignals} ERC-20 transfer signal${tokenSignals === 1 ? "" : "s"}`, realSignals ? "good" : "neutral")}
+        ${analyticsCard("Investor signal", `${analytics.peakScore}/100`, analytics.totalSignals ? `Weighted risk ${analytics.weightedRiskScore}/100` : "Awaiting first signal", analytics.peakScore >= 80 ? "danger" : analytics.peakScore >= 60 ? "warn" : "neutral")}
+        ${analyticsCard("Data coverage", `${analytics.realSignals} real`, `${analytics.erc20Signals} ERC-20 · ${analytics.nativeSignals} native`, analytics.realSignals ? "good" : "neutral")}
+        ${analyticsCard("Review quality", `${analytics.reviewRate}%`, `${analytics.unresolved} open · ${analytics.suspiciousRate}% suspicious verdict rate`, analytics.unresolved ? "warn" : analytics.totalSignals ? "good" : "neutral")}
       </section>
 
       <section class="dashboard-grid">
@@ -38,13 +52,13 @@ export function analyticsDashboardView(): string {
               <strong>${setupProgress()}%</strong>
               <small>${nextStep()}</small>
             </div>
-            ${sparkBars(state.incidents)}
+            ${sparkBars(analytics.activityBuckets)}
           </div>
           <div class="metric-strip">
-            ${metric("Total signals", alerts)}
-            ${metric("Unresolved", unresolved)}
-            ${metric("Suspicious", suspicious)}
-            ${metric("Real tx", realSignals)}
+            ${metric("Total signals", analytics.totalSignals)}
+            ${metric("Unresolved", analytics.unresolved)}
+            ${metric("Suspicious", analytics.suspicious)}
+            ${metric("Real tx", analytics.realSignals)}
           </div>
         </article>
 
@@ -55,7 +69,7 @@ export function analyticsDashboardView(): string {
               <h2>Signal quality</h2>
             </div>
           </div>
-          ${alphaRadar(state.incidents)}
+          ${alphaRadar(analytics)}
         </article>
 
         <article class="chart-panel">
@@ -65,7 +79,17 @@ export function analyticsDashboardView(): string {
               <h2>Mantle coverage</h2>
             </div>
           </div>
-          ${dataCoverage(state.incidents)}
+          ${dataCoverage(analytics)}
+        </article>
+
+        <article class="chart-panel">
+          <div class="panel-head compact">
+            <div>
+              <span class="eyebrow">Statistical depth</span>
+              <h2>Score distribution</h2>
+            </div>
+          </div>
+          ${scoreDistribution(analytics)}
         </article>
 
         <aside class="chart-panel">
@@ -97,7 +121,8 @@ export function analyticsDashboardView(): string {
             ${statusBadge("Agent ID", `#${agent.id}`, state.agentCreated ? "good" : "warn")}
             ${statusBadge("Identity", agent.identityStatus === "erc8004-registered" ? "ERC-8004 registered" : "Local profile", agent.identityStatus === "erc8004-registered" ? "good" : "warn")}
             ${statusBadge("AI", aiLabel(), state.openAiConfigured ? "good" : "neutral")}
-            ${statusBadge("Monitor health", state.monitorLastError ? "Error" : state.monitorLastCheckedAt ? "Fresh" : "Pending", state.monitorLastError ? "warn" : state.monitorLastCheckedAt ? "good" : "neutral")}
+            ${statusBadge("Monitor health", monitorHealthLabel(analytics), state.monitorLastError || analytics.isMonitorStale ? "warn" : state.monitorLastCheckedAt ? "good" : "neutral")}
+            ${statusBadge("Latest signal age", analytics.latestAgeMinutes === null ? "Pending" : `${analytics.latestAgeMinutes}m`, analytics.latestAgeMinutes !== null && analytics.latestAgeMinutes <= 60 ? "good" : "neutral")}
           </div>
         </article>
 
@@ -108,7 +133,27 @@ export function analyticsDashboardView(): string {
               <h2>Signal taxonomy</h2>
             </div>
           </div>
-          ${signalTaxonomy(state.incidents)}
+          ${signalTaxonomy(analytics)}
+        </article>
+
+        <article class="chart-panel">
+          <div class="panel-head compact">
+            <div>
+              <span class="eyebrow">Concentration</span>
+              <h2>Wallet and recipient exposure</h2>
+            </div>
+          </div>
+          ${concentrationPanel(analytics)}
+        </article>
+
+        <article class="chart-panel">
+          <div class="panel-head compact">
+            <div>
+              <span class="eyebrow">Decision factors</span>
+              <h2>Reason-code statistics</h2>
+            </div>
+          </div>
+          ${reasonCodePanel(analytics)}
         </article>
 
         <article class="chart-panel wide">
@@ -117,10 +162,10 @@ export function analyticsDashboardView(): string {
               <span class="eyebrow">Investor signals</span>
               <h2>Signals and outcomes</h2>
             </div>
-            <span class="pill">${state.incidents.length ? "Live ledger view" : "No incidents yet"}</span>
+            <span class="pill">${analytics.totalSignals ? "Live ledger view" : "No incidents yet"}</span>
           </div>
-          ${latest ? alertCard() : noAlertState()}
-          ${signalTable(state.incidents)}
+          ${latest ? alertCard(latest) : noAlertState()}
+          ${signalTable(incidents)}
         </article>
 
         <article class="chart-panel">
@@ -205,4 +250,11 @@ function monitorDetail(): string {
   if (state.monitorLastError) return `Last error: ${state.monitorLastError}`;
   if (state.monitorLastBlock) return `Last scanned block ${state.monitorLastBlock}`;
   return state.monitorActive ? "Polling Mantle wallet and token flow" : "Start monitoring from Telegram";
+}
+
+function monitorHealthLabel(analytics: AnalyticsSummary): string {
+  if (state.monitorLastError) return "Error";
+  if (analytics.isMonitorStale) return `${analytics.monitorStaleMinutes}m stale`;
+  if (analytics.monitorStaleMinutes !== null) return `${analytics.monitorStaleMinutes}m ago`;
+  return "Pending";
 }

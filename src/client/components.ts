@@ -1,9 +1,9 @@
 import { agent, state } from "./state.js";
 import { proofValue, short, txLink } from "./format.js";
+import type { AnalyticsSummary } from "./analytics.js";
 import type { PublicState } from "./types.js";
 
-export function alertCard(): string {
-  const latest = state.incidents[0];
+export function alertCard(latest = state.incidents[0]): string {
   const amount = incidentAmount(latest);
   const recipient = latest?.recipient || agent.recipient || "Pending";
   const evidence = latest?.evidenceTxHash || agent.tx;
@@ -27,7 +27,7 @@ export function alertCard(): string {
   `;
 }
 
-export function metric(label: string, value: number): string {
+export function metric(label: string, value: number | string): string {
   return `
     <div class="metric">
       <span>${label}</span>
@@ -46,8 +46,7 @@ export function analyticsCard(title: string, value: string, detail: string, tone
   `;
 }
 
-export function sparkBars(incidents: PublicState["incidents"]): string {
-  const buckets = bucketIncidents(incidents);
+export function sparkBars(buckets: number[]): string {
   const max = Math.max(1, ...buckets);
 
   return `
@@ -124,16 +123,14 @@ export function signalTable(incidents: PublicState["incidents"]): string {
   `;
 }
 
-export function alphaRadar(incidents: PublicState["incidents"]): string {
-  const maxScore = Math.max(0, ...incidents.map((incident) => incident.signalScore || 0));
-  const averageScore = incidents.length ? Math.round(incidents.reduce((sum, incident) => sum + (incident.signalScore || 0), 0) / incidents.length) : 0;
-  const highRelevance = incidents.filter((incident) => incident.investorRelevance === "high").length;
-  const unresolved = incidents.filter((incident) => incident.outcome === "Unresolved").length;
+export function alphaRadar(summary: AnalyticsSummary): string {
   const rows = [
-    ["Peak signal", maxScore, "Highest scored anomaly"],
-    ["Average score", averageScore, "Mean signal intensity"],
-    ["High relevance", highRelevance, "Investor-grade flags"],
-    ["Open reviews", unresolved, "Needs operator label"],
+    ["Peak signal", summary.peakScore, "Highest scored anomaly"],
+    ["Weighted risk", summary.weightedRiskScore, "Outcome adjusted score"],
+    ["Average score", summary.averageScore, "Mean signal intensity"],
+    ["Median score", summary.medianScore, "Central signal intensity"],
+    ["High relevance", summary.highRelevance, "Investor-grade flags"],
+    ["Open reviews", summary.unresolved, "Needs operator label"],
   ] as const;
 
   return `
@@ -153,34 +150,82 @@ export function alphaRadar(incidents: PublicState["incidents"]): string {
   `;
 }
 
-export function dataCoverage(incidents: PublicState["incidents"]): string {
-  const native = incidents.filter((incident) => (incident.asset || "MNT") === "MNT").length;
-  const erc20 = incidents.filter((incident) => incident.asset === "ERC20").length;
-  const total = Math.max(1, incidents.length);
+export function dataCoverage(summary: AnalyticsSummary): string {
   return `
     <div class="coverage-grid">
       <div>
         <span>Native MNT</span>
-        <strong>${native}</strong>
-        <small>${Math.round((native / total) * 100)}% of signals</small>
+        <strong>${summary.nativeSignals}</strong>
+        <small>${summary.nativeRate}% of signals · ${formatNumber(summary.totalNativeMnt)} MNT</small>
       </div>
       <div>
         <span>ERC-20 transfers</span>
-        <strong>${erc20}</strong>
-        <small>${Math.round((erc20 / total) * 100)}% of signals</small>
+        <strong>${summary.erc20Signals}</strong>
+        <small>${summary.erc20Rate}% of signals · ${formatNumber(summary.totalTokenAmount)} tokens</small>
+      </div>
+      <div>
+        <span>Contract interactions</span>
+        <strong>${summary.contractSignals}</strong>
+        <small>Known protocol, router, bridge, or contract flow</small>
+      </div>
+      <div>
+        <span>Real Mantle coverage</span>
+        <strong>${summary.realSignalRate}%</strong>
+        <small>${summary.realSignals} real · ${summary.demoSignals} demo</small>
       </div>
     </div>
   `;
 }
 
-export function signalTaxonomy(incidents: PublicState["incidents"]): string {
-  const counts = new Map<string, number>();
-  for (const incident of incidents) counts.set(incident.signalType || incident.severity, (counts.get(incident.signalType || incident.severity) || 0) + 1);
-  const rows = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+export function signalTaxonomy(summary: AnalyticsSummary): string {
+  const rows = summary.categoryBreakdown;
   if (!rows.length) return `<div class="empty-state compact-empty"><strong>No taxonomy yet</strong><p>Signal categories appear after policy matches.</p></div>`;
   return `
     <div class="taxonomy-list">
-      ${rows.map(([label, count]) => `<div><span>${label}</span><strong>${count}</strong></div>`).join("")}
+      ${rows.map((row) => `<div><span>${row.label}</span><strong>${row.count}</strong><small>${row.percent}%</small></div>`).join("")}
+    </div>
+  `;
+}
+
+export function scoreDistribution(summary: AnalyticsSummary): string {
+  const labels = ["0-19", "20-39", "40-59", "60-79", "80-100"];
+  const max = Math.max(1, ...summary.scoreBuckets);
+  return `
+    <div class="distribution-list">
+      ${summary.scoreBuckets
+        .map((count, index) => {
+          const width = Math.round((count / max) * 100);
+          return `
+            <div>
+              <span>${labels[index]}</span>
+              <strong>${count}</strong>
+              <i style="--fill:${width}%"></i>
+            </div>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+export function concentrationPanel(summary: AnalyticsSummary): string {
+  const topRecipient = summary.topRecipient ? `${short(summary.topRecipient.value)} (${summary.topRecipient.count})` : "None";
+  const topWallet = summary.topWallet ? `${summary.topWallet.value} (${summary.topWallet.count})` : "None";
+  return `
+    <div class="concentration-grid">
+      ${statusBadge("Unique recipients", String(summary.uniqueRecipients), "neutral")}
+      ${statusBadge("Unique wallets", String(summary.uniqueWallets), "neutral")}
+      ${statusBadge("Top recipient", topRecipient, "warn")}
+      ${statusBadge("Top wallet", topWallet, "neutral")}
+    </div>
+  `;
+}
+
+export function reasonCodePanel(summary: AnalyticsSummary): string {
+  if (!summary.reasonCodeBreakdown.length) return `<div class="empty-state compact-empty"><strong>No reason-code stats</strong><p>Reason codes appear after evaluated policy matches.</p></div>`;
+  return `
+    <div class="taxonomy-list">
+      ${summary.reasonCodeBreakdown.map((row) => `<div><span>${row.label}</span><strong>${row.count}</strong><small>${row.percent}%</small></div>`).join("")}
     </div>
   `;
 }
@@ -210,19 +255,6 @@ export function proofTimeline(): string {
   `;
 }
 
-function bucketIncidents(incidents: PublicState["incidents"]): number[] {
-  const bucketCount = 18;
-  const buckets = Array.from({ length: bucketCount }, () => 0);
-  if (!incidents.length) return buckets;
-
-  incidents.slice(0, bucketCount).forEach((incident, index) => {
-    const bucketIndex = bucketCount - 1 - index;
-    buckets[bucketIndex] = (buckets[bucketIndex] ?? 0) + (incident.outcome === "Suspicious Activity" ? 2 : 1);
-  });
-
-  return buckets;
-}
-
 export function statusBadge(label: string, value: string, tone: "good" | "warn" | "neutral" = "neutral"): string {
   return `
     <div class="status-badge ${tone}">
@@ -250,4 +282,8 @@ function incidentAmount(incident?: PublicState["incidents"][number]): string {
   if (!incident) return "Unknown";
   if (incident.asset === "ERC20") return `${incident.tokenAmount || "Unknown"} ${incident.tokenSymbol || "ERC20"}`;
   return `${incident.outflowAmountMnt} MNT`;
+}
+
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat("en", { maximumFractionDigits: 2 }).format(value);
 }

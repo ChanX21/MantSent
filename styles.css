@@ -497,6 +497,8 @@ code {
 .alpha-radar,
 .coverage-grid,
 .taxonomy-list,
+.distribution-list,
+.concentration-grid,
 .proof-timeline {
   display: grid;
   gap: 10px;
@@ -509,7 +511,8 @@ code {
 
 .alpha-radar div,
 .coverage-grid div,
-.taxonomy-list div {
+.taxonomy-list div,
+.distribution-list div {
   display: grid;
   gap: 6px;
   min-height: 78px;
@@ -521,13 +524,15 @@ code {
 
 .alpha-radar strong,
 .coverage-grid strong,
-.taxonomy-list strong {
+.taxonomy-list strong,
+.distribution-list strong {
   color: var(--mantle-soft);
   font-size: 1.45rem;
 }
 
 .alpha-radar small,
-.coverage-grid small {
+.coverage-grid small,
+.taxonomy-list small {
   color: var(--muted);
 }
 
@@ -536,9 +541,28 @@ code {
 }
 
 .taxonomy-list div {
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   min-height: 54px;
+}
+
+.distribution-list div {
+  grid-template-columns: 64px 48px minmax(0, 1fr);
+  align-items: center;
+  min-height: 52px;
+}
+
+.distribution-list i {
+  display: block;
+  height: 10px;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, var(--mantle-soft) var(--fill), rgba(255, 255, 255, 0.08) var(--fill)),
+    rgba(255, 255, 255, 0.08);
+}
+
+.concentration-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .proof-timeline div {
@@ -792,7 +816,9 @@ code {
 
   .kpi-grid,
   .metric-strip,
-  .command-grid {
+  .command-grid,
+  .alpha-radar,
+  .concentration-grid {
     grid-template-columns: 1fr;
   }
 

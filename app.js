@@ -1,3 +1,157 @@
+// src/client/analytics.ts
+function createAnalyticsSummary(state2, now = /* @__PURE__ */ new Date()) {
+  const incidents = sortedIncidents(state2.incidents);
+  const totalSignals = incidents.length;
+  const scores = incidents.map((incident) => clampScore(incident.signalScore));
+  const unresolved = incidents.filter((incident) => incident.outcome === "Unresolved").length;
+  const suspicious = incidents.filter((incident) => incident.outcome === "Suspicious Activity").length;
+  const expected = incidents.filter((incident) => incident.outcome === "Expected Transfer").length;
+  const realSignals = incidents.filter((incident) => incident.source === "mantle-transaction").length;
+  const demoSignals = incidents.filter((incident) => incident.source === "demo").length;
+  const nativeSignals = incidents.filter((incident) => incidentAsset(incident) === "MNT").length;
+  const erc20Signals = incidents.filter((incident) => incidentAsset(incident) === "ERC20").length;
+  const contractSignals = incidents.filter((incident) => Boolean(incident.contractType || incident.contractLabel || incident.signalSource === "contract_interaction")).length;
+  const highRelevance = incidents.filter((incident) => incident.investorRelevance === "high").length;
+  const highConfidence = incidents.filter((incident) => incident.signalConfidence === "high").length;
+  const criticalSeverity = incidents.filter((incident) => incident.signalSeverity === "critical" || incident.severity === "CRITICAL").length;
+  const peakScore = Math.max(0, ...scores);
+  const averageScore = scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : 0;
+  const medianScore = median(scores);
+  const scoreSpread = scores.length ? Math.max(...scores) - Math.min(...scores) : 0;
+  const weightedRiskScore = weightedRisk(incidents);
+  const latestIncident = incidents[0];
+  const monitorStaleMinutes = ageMinutes(state2.monitorLastCheckedAt, now);
+  const latestAgeMinutes = latestIncident ? ageMinutes(latestIncident.createdAt, now) : null;
+  return {
+    totalSignals,
+    latestIncident,
+    unresolved,
+    suspicious,
+    expected,
+    realSignals,
+    demoSignals,
+    nativeSignals,
+    erc20Signals,
+    contractSignals,
+    highRelevance,
+    highConfidence,
+    criticalSeverity,
+    peakScore,
+    averageScore,
+    medianScore,
+    scoreSpread,
+    weightedRiskScore,
+    reviewRate: percent(totalSignals - unresolved, totalSignals),
+    suspiciousRate: percent(suspicious, Math.max(1, suspicious + expected)),
+    realSignalRate: percent(realSignals, totalSignals),
+    erc20Rate: percent(erc20Signals, totalSignals),
+    nativeRate: percent(nativeSignals, totalSignals),
+    monitorStaleMinutes,
+    isMonitorStale: state2.monitorActive && monitorStaleMinutes !== null && monitorStaleMinutes > 15,
+    latestAgeMinutes,
+    totalNativeMnt: sumAmounts(incidents, "MNT"),
+    totalTokenAmount: sumAmounts(incidents, "ERC20"),
+    uniqueRecipients: uniqueCount(incidents.map((incident) => incident.recipient)),
+    uniqueWallets: uniqueCount(incidents.map((incident) => incident.watchedWallet || incident.walletLabel || "")),
+    topRecipient: topCount(incidents.map((incident) => incident.recipient)),
+    topWallet: topCount(incidents.map((incident) => incident.walletLabel || incident.watchedWallet || "")),
+    categoryBreakdown: breakdown(incidents.map((incident) => incident.signalType || incident.severity), totalSignals),
+    sourceBreakdown: breakdown(incidents.map((incident) => sourceLabel(incident)), totalSignals),
+    reasonCodeBreakdown: breakdown(incidents.flatMap((incident) => incident.reasonCodes || []), totalSignals),
+    scoreBuckets: scoreBuckets(scores),
+    activityBuckets: activityBuckets(incidents)
+  };
+}
+function sortedIncidents(incidents) {
+  return [...incidents].sort((a, b) => timestamp(b.createdAt) - timestamp(a.createdAt));
+}
+function weightedRisk(incidents) {
+  if (!incidents.length) return 0;
+  const weighted = incidents.reduce((sum, incident) => {
+    const outcomeWeight = incident.outcome === "Suspicious Activity" ? 1.15 : incident.outcome === "Unresolved" ? 1.05 : 0.7;
+    const relevanceWeight = incident.investorRelevance === "high" ? 1.1 : incident.investorRelevance === "medium" ? 1 : 0.85;
+    return sum + clampScore(incident.signalScore) * outcomeWeight * relevanceWeight;
+  }, 0);
+  return Math.min(100, Math.round(weighted / incidents.length));
+}
+function scoreBuckets(scores) {
+  const buckets = [0, 0, 0, 0, 0];
+  for (const score of scores) {
+    const index = Math.min(4, Math.floor(clampScore(score) / 20));
+    buckets[index] = (buckets[index] ?? 0) + 1;
+  }
+  return buckets;
+}
+function activityBuckets(incidents) {
+  const bucketCount = 18;
+  const buckets = Array.from({ length: bucketCount }, () => 0);
+  incidents.slice(0, bucketCount).forEach((incident, index) => {
+    const bucketIndex = bucketCount - 1 - index;
+    buckets[bucketIndex] = (buckets[bucketIndex] ?? 0) + (incident.outcome === "Suspicious Activity" ? 2 : 1);
+  });
+  return buckets;
+}
+function breakdown(labels, total) {
+  const counts = /* @__PURE__ */ new Map();
+  for (const rawLabel of labels) {
+    const label = rawLabel || "Unclassified";
+    counts.set(label, (counts.get(label) || 0) + 1);
+  }
+  return Array.from(counts.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 6).map(([label, count]) => ({ label, count, percent: percent(count, total) }));
+}
+function topCount(values) {
+  const [first] = breakdown(values.filter(Boolean), values.filter(Boolean).length);
+  return first ? { value: first.label, count: first.count } : null;
+}
+function uniqueCount(values) {
+  return new Set(values.filter(Boolean).map((value) => value.toLowerCase())).size;
+}
+function sumAmounts(incidents, asset) {
+  return round2(
+    incidents.filter((incident) => incidentAsset(incident) === asset).reduce((sum, incident) => sum + parseAmount(asset === "MNT" ? incident.outflowAmountMnt : incident.tokenAmount), 0)
+  );
+}
+function parseAmount(value) {
+  if (!value) return 0;
+  const parsed = Number(value.replace(/,/g, ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+function incidentAsset(incident) {
+  return incident.asset === "ERC20" ? "ERC20" : "MNT";
+}
+function sourceLabel(incident) {
+  if (incident.source === "demo") return "Demo";
+  if (incident.asset === "ERC20") return "Mantle ERC-20";
+  return "Mantle native";
+}
+function median(values) {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const midpoint = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 1) return sorted[midpoint] ?? 0;
+  return Math.round(((sorted[midpoint - 1] ?? 0) + (sorted[midpoint] ?? 0)) / 2);
+}
+function percent(value, total) {
+  if (!total) return 0;
+  return Math.round(value / total * 100);
+}
+function clampScore(score) {
+  if (!Number.isFinite(score)) return 0;
+  return Math.max(0, Math.min(100, Math.round(score ?? 0)));
+}
+function ageMinutes(value, now) {
+  const then = timestamp(value);
+  if (!then) return null;
+  return Math.max(0, Math.round((now.getTime() - then) / 6e4));
+}
+function timestamp(value) {
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+function round2(value) {
+  return Math.round(value * 100) / 100;
+}
+
 // src/client/state.ts
 var state = {
   agentCreated: false,
@@ -113,8 +267,7 @@ function proofValue(hash) {
 }
 
 // src/client/components.ts
-function alertCard() {
-  const latest = state.incidents[0];
+function alertCard(latest = state.incidents[0]) {
   const amount = incidentAmount(latest);
   const recipient = latest?.recipient || agent.recipient || "Pending";
   const evidence = latest?.evidenceTxHash || agent.tx;
@@ -154,8 +307,7 @@ function analyticsCard(title, value, detail, tone = "neutral") {
     </article>
   `;
 }
-function sparkBars(incidents) {
-  const buckets = bucketIncidents(incidents);
+function sparkBars(buckets) {
   const max = Math.max(1, ...buckets);
   return `
     <div class="spark-panel" aria-label="Signal activity chart">
@@ -220,16 +372,14 @@ function signalTable(incidents) {
     </div>
   `;
 }
-function alphaRadar(incidents) {
-  const maxScore = Math.max(0, ...incidents.map((incident) => incident.signalScore || 0));
-  const averageScore = incidents.length ? Math.round(incidents.reduce((sum, incident) => sum + (incident.signalScore || 0), 0) / incidents.length) : 0;
-  const highRelevance = incidents.filter((incident) => incident.investorRelevance === "high").length;
-  const unresolved = incidents.filter((incident) => incident.outcome === "Unresolved").length;
+function alphaRadar(summary) {
   const rows = [
-    ["Peak signal", maxScore, "Highest scored anomaly"],
-    ["Average score", averageScore, "Mean signal intensity"],
-    ["High relevance", highRelevance, "Investor-grade flags"],
-    ["Open reviews", unresolved, "Needs operator label"]
+    ["Peak signal", summary.peakScore, "Highest scored anomaly"],
+    ["Weighted risk", summary.weightedRiskScore, "Outcome adjusted score"],
+    ["Average score", summary.averageScore, "Mean signal intensity"],
+    ["Median score", summary.medianScore, "Central signal intensity"],
+    ["High relevance", summary.highRelevance, "Investor-grade flags"],
+    ["Open reviews", summary.unresolved, "Needs operator label"]
   ];
   return `
     <div class="alpha-radar">
@@ -245,33 +395,76 @@ function alphaRadar(incidents) {
     </div>
   `;
 }
-function dataCoverage(incidents) {
-  const native = incidents.filter((incident) => (incident.asset || "MNT") === "MNT").length;
-  const erc20 = incidents.filter((incident) => incident.asset === "ERC20").length;
-  const total = Math.max(1, incidents.length);
+function dataCoverage(summary) {
   return `
     <div class="coverage-grid">
       <div>
         <span>Native MNT</span>
-        <strong>${native}</strong>
-        <small>${Math.round(native / total * 100)}% of signals</small>
+        <strong>${summary.nativeSignals}</strong>
+        <small>${summary.nativeRate}% of signals \xB7 ${formatNumber(summary.totalNativeMnt)} MNT</small>
       </div>
       <div>
         <span>ERC-20 transfers</span>
-        <strong>${erc20}</strong>
-        <small>${Math.round(erc20 / total * 100)}% of signals</small>
+        <strong>${summary.erc20Signals}</strong>
+        <small>${summary.erc20Rate}% of signals \xB7 ${formatNumber(summary.totalTokenAmount)} tokens</small>
+      </div>
+      <div>
+        <span>Contract interactions</span>
+        <strong>${summary.contractSignals}</strong>
+        <small>Known protocol, router, bridge, or contract flow</small>
+      </div>
+      <div>
+        <span>Real Mantle coverage</span>
+        <strong>${summary.realSignalRate}%</strong>
+        <small>${summary.realSignals} real \xB7 ${summary.demoSignals} demo</small>
       </div>
     </div>
   `;
 }
-function signalTaxonomy(incidents) {
-  const counts = /* @__PURE__ */ new Map();
-  for (const incident of incidents) counts.set(incident.signalType || incident.severity, (counts.get(incident.signalType || incident.severity) || 0) + 1);
-  const rows = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+function signalTaxonomy(summary) {
+  const rows = summary.categoryBreakdown;
   if (!rows.length) return `<div class="empty-state compact-empty"><strong>No taxonomy yet</strong><p>Signal categories appear after policy matches.</p></div>`;
   return `
     <div class="taxonomy-list">
-      ${rows.map(([label, count]) => `<div><span>${label}</span><strong>${count}</strong></div>`).join("")}
+      ${rows.map((row) => `<div><span>${row.label}</span><strong>${row.count}</strong><small>${row.percent}%</small></div>`).join("")}
+    </div>
+  `;
+}
+function scoreDistribution(summary) {
+  const labels = ["0-19", "20-39", "40-59", "60-79", "80-100"];
+  const max = Math.max(1, ...summary.scoreBuckets);
+  return `
+    <div class="distribution-list">
+      ${summary.scoreBuckets.map((count, index) => {
+    const width = Math.round(count / max * 100);
+    return `
+            <div>
+              <span>${labels[index]}</span>
+              <strong>${count}</strong>
+              <i style="--fill:${width}%"></i>
+            </div>
+          `;
+  }).join("")}
+    </div>
+  `;
+}
+function concentrationPanel(summary) {
+  const topRecipient = summary.topRecipient ? `${short(summary.topRecipient.value)} (${summary.topRecipient.count})` : "None";
+  const topWallet = summary.topWallet ? `${summary.topWallet.value} (${summary.topWallet.count})` : "None";
+  return `
+    <div class="concentration-grid">
+      ${statusBadge("Unique recipients", String(summary.uniqueRecipients), "neutral")}
+      ${statusBadge("Unique wallets", String(summary.uniqueWallets), "neutral")}
+      ${statusBadge("Top recipient", topRecipient, "warn")}
+      ${statusBadge("Top wallet", topWallet, "neutral")}
+    </div>
+  `;
+}
+function reasonCodePanel(summary) {
+  if (!summary.reasonCodeBreakdown.length) return `<div class="empty-state compact-empty"><strong>No reason-code stats</strong><p>Reason codes appear after evaluated policy matches.</p></div>`;
+  return `
+    <div class="taxonomy-list">
+      ${summary.reasonCodeBreakdown.map((row) => `<div><span>${row.label}</span><strong>${row.count}</strong><small>${row.percent}%</small></div>`).join("")}
     </div>
   `;
 }
@@ -296,16 +489,6 @@ function proofTimeline() {
     </div>
   `;
 }
-function bucketIncidents(incidents) {
-  const bucketCount = 18;
-  const buckets = Array.from({ length: bucketCount }, () => 0);
-  if (!incidents.length) return buckets;
-  incidents.slice(0, bucketCount).forEach((incident, index) => {
-    const bucketIndex = bucketCount - 1 - index;
-    buckets[bucketIndex] = (buckets[bucketIndex] ?? 0) + (incident.outcome === "Suspicious Activity" ? 2 : 1);
-  });
-  return buckets;
-}
 function statusBadge(label, value, tone = "neutral") {
   return `
     <div class="status-badge ${tone}">
@@ -319,16 +502,15 @@ function incidentAmount(incident) {
   if (incident.asset === "ERC20") return `${incident.tokenAmount || "Unknown"} ${incident.tokenSymbol || "ERC20"}`;
   return `${incident.outflowAmountMnt} MNT`;
 }
+function formatNumber(value) {
+  return new Intl.NumberFormat("en", { maximumFractionDigits: 2 }).format(value);
+}
 
 // src/client/views.ts
 function analyticsDashboardView() {
-  const alerts = state.incidents.length;
-  const unresolved = state.incidents.filter((incident) => incident.outcome === "Unresolved").length;
-  const suspicious = state.incidents.filter((incident) => incident.outcome === "Suspicious Activity").length;
-  const realSignals = state.incidents.filter((incident) => incident.source === "mantle-transaction").length;
-  const tokenSignals = state.incidents.filter((incident) => incident.asset === "ERC20").length;
-  const maxSignalScore = Math.max(0, ...state.incidents.map((incident) => incident.signalScore || 0));
-  const latest = state.incidents[0];
+  const analytics = createAnalyticsSummary(state);
+  const incidents = sortedIncidents(state.incidents);
+  const latest = analytics.latestIncident;
   const walletProfile = state.watchedWallets[0];
   const watchedWalletCount = state.watchedWallets.length;
   return `
@@ -337,8 +519,9 @@ function analyticsDashboardView() {
         ${analyticsCard("Treasury monitor", state.monitorActive ? "Live" : "Off", monitorDetail(), state.monitorLastError ? "danger" : state.monitorActive ? "good" : "warn")}
         ${analyticsCard("Watchlist", watchedWalletCount ? `${watchedWalletCount} wallets` : "Not set", walletProfile ? `${walletProfile.label} \xB7 ${walletProfile.category}` : "Use /watch or /watch_add in Telegram", watchedWalletCount ? "good" : "warn")}
         ${analyticsCard("Policy", policyTitle(), state.policyActive ? policyDetail() : "Use /policy in Telegram", state.policyActive ? "good" : "warn")}
-        ${analyticsCard("Investor signal", `${maxSignalScore}/100`, alerts ? "Peak scored Mantle signal" : "Awaiting first signal", maxSignalScore >= 80 ? "danger" : maxSignalScore >= 60 ? "warn" : "neutral")}
-        ${analyticsCard("Data coverage", `${realSignals} real`, `${tokenSignals} ERC-20 transfer signal${tokenSignals === 1 ? "" : "s"}`, realSignals ? "good" : "neutral")}
+        ${analyticsCard("Investor signal", `${analytics.peakScore}/100`, analytics.totalSignals ? `Weighted risk ${analytics.weightedRiskScore}/100` : "Awaiting first signal", analytics.peakScore >= 80 ? "danger" : analytics.peakScore >= 60 ? "warn" : "neutral")}
+        ${analyticsCard("Data coverage", `${analytics.realSignals} real`, `${analytics.erc20Signals} ERC-20 \xB7 ${analytics.nativeSignals} native`, analytics.realSignals ? "good" : "neutral")}
+        ${analyticsCard("Review quality", `${analytics.reviewRate}%`, `${analytics.unresolved} open \xB7 ${analytics.suspiciousRate}% suspicious verdict rate`, analytics.unresolved ? "warn" : analytics.totalSignals ? "good" : "neutral")}
       </section>
 
       <section class="dashboard-grid">
@@ -356,13 +539,13 @@ function analyticsDashboardView() {
               <strong>${setupProgress()}%</strong>
               <small>${nextStep()}</small>
             </div>
-            ${sparkBars(state.incidents)}
+            ${sparkBars(analytics.activityBuckets)}
           </div>
           <div class="metric-strip">
-            ${metric("Total signals", alerts)}
-            ${metric("Unresolved", unresolved)}
-            ${metric("Suspicious", suspicious)}
-            ${metric("Real tx", realSignals)}
+            ${metric("Total signals", analytics.totalSignals)}
+            ${metric("Unresolved", analytics.unresolved)}
+            ${metric("Suspicious", analytics.suspicious)}
+            ${metric("Real tx", analytics.realSignals)}
           </div>
         </article>
 
@@ -373,7 +556,7 @@ function analyticsDashboardView() {
               <h2>Signal quality</h2>
             </div>
           </div>
-          ${alphaRadar(state.incidents)}
+          ${alphaRadar(analytics)}
         </article>
 
         <article class="chart-panel">
@@ -383,7 +566,17 @@ function analyticsDashboardView() {
               <h2>Mantle coverage</h2>
             </div>
           </div>
-          ${dataCoverage(state.incidents)}
+          ${dataCoverage(analytics)}
+        </article>
+
+        <article class="chart-panel">
+          <div class="panel-head compact">
+            <div>
+              <span class="eyebrow">Statistical depth</span>
+              <h2>Score distribution</h2>
+            </div>
+          </div>
+          ${scoreDistribution(analytics)}
         </article>
 
         <aside class="chart-panel">
@@ -415,7 +608,8 @@ function analyticsDashboardView() {
             ${statusBadge("Agent ID", `#${agent.id}`, state.agentCreated ? "good" : "warn")}
             ${statusBadge("Identity", agent.identityStatus === "erc8004-registered" ? "ERC-8004 registered" : "Local profile", agent.identityStatus === "erc8004-registered" ? "good" : "warn")}
             ${statusBadge("AI", aiLabel(), state.openAiConfigured ? "good" : "neutral")}
-            ${statusBadge("Monitor health", state.monitorLastError ? "Error" : state.monitorLastCheckedAt ? "Fresh" : "Pending", state.monitorLastError ? "warn" : state.monitorLastCheckedAt ? "good" : "neutral")}
+            ${statusBadge("Monitor health", monitorHealthLabel(analytics), state.monitorLastError || analytics.isMonitorStale ? "warn" : state.monitorLastCheckedAt ? "good" : "neutral")}
+            ${statusBadge("Latest signal age", analytics.latestAgeMinutes === null ? "Pending" : `${analytics.latestAgeMinutes}m`, analytics.latestAgeMinutes !== null && analytics.latestAgeMinutes <= 60 ? "good" : "neutral")}
           </div>
         </article>
 
@@ -426,7 +620,27 @@ function analyticsDashboardView() {
               <h2>Signal taxonomy</h2>
             </div>
           </div>
-          ${signalTaxonomy(state.incidents)}
+          ${signalTaxonomy(analytics)}
+        </article>
+
+        <article class="chart-panel">
+          <div class="panel-head compact">
+            <div>
+              <span class="eyebrow">Concentration</span>
+              <h2>Wallet and recipient exposure</h2>
+            </div>
+          </div>
+          ${concentrationPanel(analytics)}
+        </article>
+
+        <article class="chart-panel">
+          <div class="panel-head compact">
+            <div>
+              <span class="eyebrow">Decision factors</span>
+              <h2>Reason-code statistics</h2>
+            </div>
+          </div>
+          ${reasonCodePanel(analytics)}
         </article>
 
         <article class="chart-panel wide">
@@ -435,10 +649,10 @@ function analyticsDashboardView() {
               <span class="eyebrow">Investor signals</span>
               <h2>Signals and outcomes</h2>
             </div>
-            <span class="pill">${state.incidents.length ? "Live ledger view" : "No incidents yet"}</span>
+            <span class="pill">${analytics.totalSignals ? "Live ledger view" : "No incidents yet"}</span>
           </div>
-          ${latest ? alertCard() : noAlertState()}
-          ${signalTable(state.incidents)}
+          ${latest ? alertCard(latest) : noAlertState()}
+          ${signalTable(incidents)}
         </article>
 
         <article class="chart-panel">
@@ -517,6 +731,12 @@ function monitorDetail() {
   if (state.monitorLastError) return `Last error: ${state.monitorLastError}`;
   if (state.monitorLastBlock) return `Last scanned block ${state.monitorLastBlock}`;
   return state.monitorActive ? "Polling Mantle wallet and token flow" : "Start monitoring from Telegram";
+}
+function monitorHealthLabel(analytics) {
+  if (state.monitorLastError) return "Error";
+  if (analytics.isMonitorStale) return `${analytics.monitorStaleMinutes}m stale`;
+  if (analytics.monitorStaleMinutes !== null) return `${analytics.monitorStaleMinutes}m ago`;
+  return "Pending";
 }
 
 // src/shared/branding.ts
