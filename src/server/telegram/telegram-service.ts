@@ -97,7 +97,7 @@ export function createTelegramService({
 
   async function sendStatus(chatId: number): Promise<void> {
     const state = actions.state();
-    const keyboard = isAuthorizedChat(chatId, adminChats) ? outcomeKeyboardFor(state) : undefined;
+    const keyboard = isAuthorizedChat(chatId, adminChats) ? actionKeyboardFor(state) : undefined;
     await call("sendMessage", {
       chat_id: chatId,
       text: statusText(state, chainId),
@@ -680,7 +680,12 @@ function formatTelegramExplanation(value: string): string {
     .replace(/\n{3,}/g, "\n\n");
 }
 
-function outcomeKeyboardFor(state: PublicState): { inline_keyboard: InlineKeyboard } | undefined {
+function actionKeyboardFor(state: PublicState): { inline_keyboard: InlineKeyboard } | undefined {
+  if (state.walletWatched && state.policyActive && !state.monitorActive) {
+    return {
+      inline_keyboard: [[{ text: "Enable Live Monitor", callback_data: "monitor_on" }]],
+    };
+  }
   if (!state.transferDetected || state.outcome !== "Unresolved") return undefined;
   return {
     inline_keyboard: [
