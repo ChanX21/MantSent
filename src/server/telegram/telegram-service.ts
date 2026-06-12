@@ -43,6 +43,8 @@ interface TelegramResponse<T> {
   description?: string;
 }
 
+type InlineButton = { text: string; callback_data: string };
+type InlineKeyboard = InlineButton[][];
 type TelegramCommand = { command: string; description: string };
 
 export interface TelegramService {
@@ -95,11 +97,13 @@ export function createTelegramService({
 
   async function sendStatus(chatId: number): Promise<void> {
     const state = actions.state();
+    const keyboard = isAuthorizedChat(chatId, adminChats) ? outcomeKeyboardFor(state) : undefined;
     await call("sendMessage", {
       chat_id: chatId,
       text: statusText(state, chainId),
       parse_mode: "HTML",
       disable_web_page_preview: true,
+      reply_markup: keyboard,
     });
   }
 
@@ -674,6 +678,18 @@ function formatTelegramExplanation(value: string): string {
     .replace(/\*\*([^*\n][^*]*?)\*\*/g, "<b>$1</b>")
     .replace(/__([^_\n][^_]*?)__/g, "<b>$1</b>")
     .replace(/\n{3,}/g, "\n\n");
+}
+
+function outcomeKeyboardFor(state: PublicState): { inline_keyboard: InlineKeyboard } | undefined {
+  if (!state.transferDetected || state.outcome !== "Unresolved") return undefined;
+  return {
+    inline_keyboard: [
+      [
+        { text: "Expected Transfer", callback_data: "expected" },
+        { text: "Suspicious Activity", callback_data: "suspicious" },
+      ],
+    ],
+  };
 }
 
 function setupProgress(state: PublicState): string {
