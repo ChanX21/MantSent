@@ -10,7 +10,7 @@ MantSent is a Telegram-operated, Mantle-native wallet intelligence agent. An ope
 
 | Dimension | Current Evidence |
 | --- | --- |
-| Technical | Modular TypeScript server/client, deterministic policy parser and engine, confirmed block polling, ERC-20 log indexing, known-contract interaction detection, Telegram admin controls, proof ledger writes, 94 parser cases in `npm run check`. |
+| Technical | Modular TypeScript server/client, deterministic policy parser and engine, confirmed block polling, monitor health telemetry, ERC-20 log indexing, known-contract interaction detection, Telegram admin controls, proof ledger writes, 94 parser cases and monitor fixtures in `npm run check`. |
 | Ecosystem fit | Uses Mantle Sepolia RPC, Mantle explorer links, deployed MantSent Signal Ledger, ERC-8004 registration flow, Mantle-branded Telegram and dashboard UX. |
 | Business potential | Clear user: treasury operators, investors, and protocol teams monitoring wallet risk. Expansion path: paid wallet watchlists, protocol/entity labels, hosted alerts, historical analytics. |
 | Innovation | Agentic wallet monitoring with deterministic policy enforcement, human feedback labels, AI explanations, and auditable Mantle proof receipts. |
@@ -23,7 +23,7 @@ MantSent is a Telegram-operated, Mantle-native wallet intelligence agent. An ope
 | Insight value | Converts wallet movement into scored signal types such as Treasury Outflow Spike, Treasury Burst, Large ERC-20 Outflow, Exchange Deposit Flow, Whale Wallet Exit, Protocol Treasury Rotation, and Bridge/Router Contract Interaction. |
 | Data source quality | Live Mantle block polling covers native transactions, ERC-20 Transfer logs, and configured known contracts. Signals include evidence transaction hashes and proof transaction hashes. |
 | Investment utility | Investors can label watched wallets as treasury, whale, protocol, exchange, fresh, or custom and receive scored activity briefs for early wallet-flow and contract-interaction monitoring. |
-| Scalability | Monitoring, policy parsing, scoring, Telegram, and dashboard are separate modules. The hackathon build supports one authorized operator with a multi-wallet watchlist; the next scalable step is moving local JSON state to a database. |
+| Scalability | Monitoring, policy parsing, scoring, Telegram, dashboard, curated labels, known contracts, and tests are separate modules. The hackathon build supports one authorized operator with a multi-wallet watchlist; the next scalable step is moving local JSON state to a database. |
 
 ## Demo Script
 

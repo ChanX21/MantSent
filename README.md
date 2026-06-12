@@ -133,6 +133,8 @@ Curated wallet labels can be provided through `MANTSENT_ENTITY_LABELS`. Operator
 
 Every policy match can commit an `AlertCommitted` proof to the Mantle Signal Ledger. Operator outcomes can commit `OutcomeRecorded` and are retained as local feedback examples for future agent explanations.
 
+Monitor health is recorded in state and shown in Telegram plus the dashboard: last scanned block, last check time, and last error. `npm run check` includes parser coverage and monitor fixture coverage for native watchlists, burst windows, curated labels, and known-contract interactions.
+
 ## Project Map
 
 The code is split by operational responsibility so a future change can be assigned and reviewed without crossing unrelated surfaces.
@@ -142,7 +144,7 @@ The code is split by operational responsibility so a future change can be assign
 | Server composition | `src/server/main.ts` | Starts HTTP, Telegram polling, env bootstrap, and dependency wiring. |
 | Product actions | `src/server/actions/action-service.ts` | Create/watch/policy/alert/outcome/reset workflows. |
 | Mantle proofs | `src/server/chain/proofs.ts`, `src/server/chain/mantle.ts` | Ledger contract calls, hashing, address normalization, provider/signer setup. |
-| Mantle monitor | `src/server/monitor/mantle-monitor.ts` | Confirmed block polling for native transactions, ERC-20 Transfer logs, and known contract interactions. |
+| Mantle monitor | `src/server/monitor/mantle-monitor.ts` | Confirmed block polling, health telemetry, native transactions, ERC-20 Transfer logs, and known contract interactions. |
 | Telegram adapter | `src/server/telegram/telegram-service.ts` | Commands, inline buttons, polling, and Telegram API calls. |
 | HTTP adapter | `src/server/http/request-handler.ts` | `/api/state`, `/api/action`, webhook route, static file serving. |
 | Persistence | `src/server/state/store.ts` | Local JSON state and public state projection. |

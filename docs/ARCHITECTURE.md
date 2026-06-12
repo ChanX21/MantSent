@@ -55,7 +55,8 @@ The monitor:
 6. Flags configured known bridge/router/contract interactions using `MANTSENT_KNOWN_CONTRACTS`.
 7. Evaluates the movement with `policy-engine.ts`.
 8. Writes `AlertCommitted` only when the active policy is breached.
-9. Stores the block cursor and incident so duplicate processing is avoided.
+9. Stores the block cursor, last checked time, last scanned block, and last error.
+10. Stores the incident so duplicate processing is avoided.
 
 Current monitor scope is native MNT, ERC-20 Transfer logs, and configured known contract interactions. It does not yet decode full swap routes, bridge completion semantics, failed transactions, NFT transfers, or gas anomalies.
 
@@ -131,4 +132,4 @@ Only ledger transaction hashes should link to Mantle explorer unless the evidenc
 2. Add monitor health telemetry, retry accounting, and admin reset tooling.
 3. Add deeper receipt-level semantic indexing for full swap routes, bridge completion, failed transactions, and gas anomalies.
 4. Expand curated protocol/entity labels from deployment config into a maintained dataset.
-5. Add tests around monitor idempotency, ERC-20 log processing, and known-contract detection with recorded Mantle fixtures.
+5. Expand monitor fixture tests with recorded real Mantle block/log payloads.
