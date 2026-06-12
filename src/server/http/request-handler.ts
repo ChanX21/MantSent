@@ -12,13 +12,14 @@ const mime: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".webp": "image/webp",
 };
 
-const staticAllowlist = new Set(["index.html", "app.js", "app.js.map", "styles.css"]);
+const staticAllowlist = new Set(["index.html", "app.js", "app.js.map", "styles.css", "favicon.ico", "favicon-32.png", "favicon.svg", "apple-touch-icon.png"]);
 
 export function createRequestHandler({ env, actions, telegram }: { env: RuntimeEnv; actions: ActionService; telegram: TelegramService }) {
   return async function serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
