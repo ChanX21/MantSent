@@ -43,8 +43,6 @@ interface TelegramResponse<T> {
   description?: string;
 }
 
-type InlineButton = { text: string; callback_data: string } | { text: string; url: string };
-type InlineKeyboard = InlineButton[][];
 type TelegramCommand = { command: string; description: string };
 
 export interface TelegramService {
@@ -97,13 +95,11 @@ export function createTelegramService({
 
   async function sendStatus(chatId: number): Promise<void> {
     const state = actions.state();
-    const keyboard = isAuthorizedChat(chatId, adminChats) ? { inline_keyboard: buttonsFor(state, chainId, demoMode) } : undefined;
     await call("sendMessage", {
       chat_id: chatId,
       text: statusText(state, chainId),
       parse_mode: "HTML",
       disable_web_page_preview: true,
-      reply_markup: keyboard,
     });
   }
 
@@ -332,6 +328,14 @@ export function createTelegramService({
           parse_mode: "HTML",
         });
         await sendStatus(chatId);
+      } else if (command === "/expected") {
+        await actions.run("expected");
+        await call("sendMessage", { chat_id: chatId, text: "<b>Outcome recorded.</b>\nMarked as expected transfer.", parse_mode: "HTML" });
+        await sendStatus(chatId);
+      } else if (command === "/suspicious") {
+        await actions.run("suspicious");
+        await call("sendMessage", { chat_id: chatId, text: "<b>Outcome recorded.</b>\nMarked as suspicious activity.", parse_mode: "HTML" });
+        await sendStatus(chatId);
       } else if (command === "/reset") {
         await actions.run("reset");
         await call("sendMessage", { chat_id: chatId, text: "<b>MantSent session reset.</b>\nUse <code>/deploy My Agent Name</code> to start again.", parse_mode: "HTML" });
@@ -346,7 +350,7 @@ export function createTelegramService({
         await call("sendMessage", {
           chat_id: chatId,
           text:
-            `<b>Commands</b>\n/deploy [agent name]\n/register [agentURI]\n/groq gsk-... [model]\n/openai sk-... [model]\n/watch 0x...\n/watch_add 0x... | Label | treasury | high\n/watch_remove 0x...\n/watchlist\n/label Treasury Ops | treasury | high\n/policies\n/policy alert me if more than 10 MNT leaves\n/monitor\n/brief\n/proof\n/reset\n/redeploy${demoMode ? "\n/demo" : ""}`,
+            `<b>Commands</b>\n/deploy [agent name]\n/register [agentURI]\n/groq gsk-... [model]\n/openai sk-... [model]\n/watch 0x...\n/watch_add 0x... | Label | treasury | high\n/watch_remove 0x...\n/watchlist\n/label Treasury Ops | treasury | high\n/policies\n/policy alert me if more than 10 MNT leaves\n/monitor\n/expected\n/suspicious\n/brief\n/proof\n/reset\n/redeploy${demoMode ? "\n/demo" : ""}`,
           parse_mode: "HTML",
         });
       }
@@ -471,6 +475,8 @@ function commandsFor(demoMode: boolean): TelegramCommand[] {
     { command: "policies", description: "Show supported policy examples" },
     { command: "policy", description: "Commit an alert policy on Mantle" },
     { command: "monitor", description: "Enable live Mantle wallet monitoring" },
+    { command: "expected", description: "Mark latest signal as expected" },
+    { command: "suspicious", description: "Mark latest signal as suspicious" },
     { command: "brief", description: "Show current risk brief" },
     { command: "openai", description: "Add an OpenAI key for richer explanations" },
     { command: "groq", description: "Add a Groq key for richer explanations" },
@@ -668,48 +674,6 @@ function formatTelegramExplanation(value: string): string {
     .replace(/\*\*([^*\n][^*]*?)\*\*/g, "<b>$1</b>")
     .replace(/__([^_\n][^_]*?)__/g, "<b>$1</b>")
     .replace(/\n{3,}/g, "\n\n");
-}
-
-function buttonsFor(state: PublicState, chainId?: string, demoMode = false): InlineKeyboard {
-  if (!state.agentCreated) {
-    return [];
-  }
-  if (state.agentIdentityStatus !== "erc8004-registered") {
-    return [
-      [{ text: "Register ERC-8004 Agent", callback_data: "register_agent" }],
-      [{ text: "Add AI Key", callback_data: "ai_setup" }],
-    ];
-  }
-  if (!state.walletWatched) {
-    const rows: InlineKeyboard = [
-      [{ text: "Add AI Key", callback_data: "ai_setup" }],
-    ];
-    if (demoMode) rows.splice(1, 0, [{ text: "Use Demo Wallet", callback_data: "watch_demo" }]);
-    return rows;
-  }
-  if (!state.policyActive) {
-    const rows: InlineKeyboard = [
-      [{ text: "How to Set Policy", callback_data: "wallet_setup" }],
-    ];
-    if (demoMode) rows.splice(1, 0, [{ text: "Use Sample Policy", callback_data: "policy_demo" }]);
-    return rows;
-  }
-  if (!state.monitorActive) {
-    const rows: InlineKeyboard = [
-      [{ text: "Enable Live Monitor", callback_data: "monitor_on" }],
-    ];
-    if (demoMode) rows.splice(1, 0, [{ text: "Run Demo Outflow", callback_data: "transfer_demo" }]);
-    return rows;
-  }
-  if (!state.transferDetected) {
-    return demoMode ? [[{ text: "Run Demo Outflow", callback_data: "transfer_demo" }]] : [];
-  }
-  return [
-    [
-      { text: "Expected Transfer", callback_data: "expected" },
-      { text: "Suspicious Activity", callback_data: "suspicious" },
-    ],
-  ];
 }
 
 function setupProgress(state: PublicState): string {
