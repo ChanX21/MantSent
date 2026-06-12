@@ -254,7 +254,7 @@ async function maybeProcessTokenTransfer(env: RuntimeEnv, log: Log, direction: "
   await onIncident?.(incident);
 }
 
-function nativeWalletMatch(
+export function nativeWalletMatch(
   watchedWallets: WatchedWalletProfile[],
   tx: TransactionResponse,
 ): { wallet: WatchedWalletProfile; direction: "incoming" | "outgoing" } | null {
@@ -277,7 +277,7 @@ async function tokenMetadata(rpc: ethers.Provider, tokenAddress: string): Promis
   return { symbol: String(symbol), decimals: Number(decimals) };
 }
 
-function recentTransactionsForPolicy(
+export function recentTransactionsForPolicy(
   existing: Array<{ hash: string; timestamp: number }>,
   hash: string,
   timestamp: number,
