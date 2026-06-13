@@ -181,6 +181,7 @@ export interface RuntimeEnv {
   MANTSENT_AGENT_URI?: string;
   MANTSENT_ENABLE_DEMO_MODE?: string;
   MANTSENT_STATE_BACKEND?: "json" | "sqlite";
+  MANTSENT_STATE_DIR?: string;
   MANTSENT_SQLITE_PATH?: string;
   MANTSENT_ENTITY_LABELS?: string;
   MANTSENT_KNOWN_CONTRACTS?: string;

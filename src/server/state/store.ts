@@ -1,9 +1,10 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { DatabaseSync } from "node:sqlite";
+import { createRequire } from "node:module";
+import type { DatabaseSync } from "node:sqlite";
 import type { AppState, PublicState } from "../../shared/types.js";
 import { createAgentProfile } from "../agent/single-wallet-monitoring-agent.js";
 
-const statePath = "data/mantsent-state.json";
+const require = createRequire(import.meta.url);
 const defaultScopeId = "default";
 const legacyDemoWallet = "0x7F2C2fbb1d2E4b6e6F8E45b902399D8A3C02a91E";
 let sqlite: DatabaseSync | null = null;
@@ -155,7 +156,7 @@ export function saveState(state: AppState, scopeId = defaultScopeId): void {
   }
 
   const path = jsonStatePath(scopeId);
-  mkdirSync("data", { recursive: true });
+  mkdirSync(dataDirectory(), { recursive: true });
   writeFileSync(path, `${JSON.stringify(state, null, 2)}\n`);
 }
 
@@ -194,7 +195,7 @@ export function activeMonitorScopes(): string[] {
   }
 
   const scopes = [defaultScopeId];
-  const dataDir = "data";
+  const dataDir = dataDirectory();
   if (!existsSync(dataDir)) return scopes;
   for (const file of readdirSync(dataDir)) {
     if (!file.startsWith("mantsent-state-") || !file.endsWith(".json")) continue;
@@ -218,8 +219,9 @@ function sqliteEnabled(): boolean {
 
 function database(): DatabaseSync {
   if (sqlite) return sqlite;
-  mkdirSync("data", { recursive: true });
-  sqlite = new DatabaseSync(process.env.MANTSENT_SQLITE_PATH || "data/mantsent.sqlite");
+  mkdirSync(dataDirectory(), { recursive: true });
+  const { DatabaseSync } = require("node:sqlite") as typeof import("node:sqlite");
+  sqlite = new DatabaseSync(process.env.MANTSENT_SQLITE_PATH || `${dataDirectory()}/mantsent.sqlite`);
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS app_states (
       scope_id TEXT PRIMARY KEY,
@@ -237,8 +239,8 @@ function database(): DatabaseSync {
 }
 
 function jsonStatePath(scopeId: string): string {
-  if (normalizeScopeId(scopeId) === defaultScopeId) return statePath;
-  return `data/mantsent-state-${safeScopeFileName(scopeId)}.json`;
+  if (normalizeScopeId(scopeId) === defaultScopeId) return `${dataDirectory()}/mantsent-state.json`;
+  return `${dataDirectory()}/mantsent-state-${safeScopeFileName(scopeId)}.json`;
 }
 
 function normalizeScopeId(scopeId: string): string {
@@ -247,4 +249,8 @@ function normalizeScopeId(scopeId: string): string {
 
 function safeScopeFileName(scopeId: string): string {
   return encodeURIComponent(normalizeScopeId(scopeId));
+}
+
+function dataDirectory(): string {
+  return process.env.MANTSENT_STATE_DIR || "data";
 }
