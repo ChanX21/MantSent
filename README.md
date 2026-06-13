@@ -96,6 +96,7 @@ The LLM only writes short explanations. Policy enforcement and proof writes rema
 - `agent-metadata.json` is the ERC-8004 agent metadata shape to publish and reference from the Identity Registry.
 - `.env.example` defaults to Mantle Sepolia chain id `5003` and the PRD-provided ERC-8004 testnet registry addresses.
 - Mantle Sepolia deployment: `0x727D5784C001808D39C5c4a85Cb27BcE748Ae879`.
+- Before DoraHacks submission, verify the deployed contract on Mantle Explorer and include the verified explorer link plus deployment address in the submission.
 
 ## Telegram
 
@@ -144,6 +145,18 @@ MANTSENT_ENABLE_DEMO_MODE=true
 6. Enable live Mantle monitoring.
 7. Resolve matching alerts as expected or suspicious in Telegram.
 8. Use the website to inspect alpha score, source coverage, signal taxonomy, incident history, and agent posture.
+
+## Shipping Award Readiness
+
+MantSent is structured to satisfy the deployment milestone award once the public deployment is live:
+
+- Smart contract deployed on Mantle Sepolia: `0x727D5784C001808D39C5c4a85Cb27BcE748Ae879`.
+- Contract verification should be completed on Mantle Explorer before submission.
+- AI-assisted incident explanations are written into the on-chain proof flow through `AlertCommitted` and operator-reviewed `OutcomeRecorded` receipts.
+- The frontend must be publicly accessible. Set `MANTSENT_DASHBOARD_BASE_URL` to the deployed HTTPS URL, not localhost.
+- Include the deployment address, public frontend URL, verified explorer link, GitHub repo, and a 2+ minute demo video in DoraHacks.
+
+See `docs/SHIPPING_AWARD_CHECKLIST.md` for the complete checklist.
 
 ## Mantle Data Coverage
 
@@ -194,6 +207,7 @@ See `docs/JUDGING.md` for the scorecard mapping and demo script.
 
 See `docs/DEPLOYMENT.md` for non-AWS hackathon deployment notes.
 See `docs/OPERATIONS.md` for reset, backup, migration, and health-check steps.
+See `docs/SHIPPING_AWARD_CHECKLIST.md` for deployment milestone award readiness.
 
 ## Guardrails
 

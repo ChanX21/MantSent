@@ -10,6 +10,8 @@ MantSent is a long-running Node service because it polls Telegram and Mantle blo
 4. Telegram bot token from BotFather.
 5. Secrets configured in the provider dashboard, not committed to git.
 
+For the shipping award, the frontend must be publicly accessible. Do not submit a localhost URL.
+
 Use:
 
 ```env
@@ -45,6 +47,26 @@ Scoped frontend access:
 ```
 
 Open the signed URL returned by Telegram. The bare root URL still loads the default public dashboard state; the signed URL loads the operator's scoped wallet, policy, incidents, monitor health, and proof timeline.
+
+## Submission Checklist
+
+- Public frontend URL is live and matches `MANTSENT_DASHBOARD_BASE_URL`.
+- `MantSentSignalLedger` is deployed on Mantle Mainnet or Testnet.
+- Contract is verified on Mantle Explorer.
+- DoraHacks submission includes:
+  - public frontend URL
+  - deployed contract address
+  - verified Mantle Explorer link
+  - GitHub repo
+  - demo video of at least 2 minutes
+- Demo video shows:
+  - Telegram `/start` and `/dashboard`
+  - agent deployment/registration
+  - wallet watch setup
+  - policy setup
+  - live monitor enablement
+  - proof or alert written to Mantle
+  - public analytics dashboard
 
 ## Vercel Caveat
 
