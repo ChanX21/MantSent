@@ -23,6 +23,13 @@ Run command:
 npm run dev
 ```
 
+Docker build:
+
+```sh
+docker build -t mantsent .
+docker run --env-file .env -p 5173:5173 -v "$PWD/data:/app/data" mantsent
+```
+
 Health check:
 
 ```text
