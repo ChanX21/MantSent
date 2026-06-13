@@ -39,7 +39,7 @@ MANTSENT_STATE_BACKEND=sqlite
 MANTSENT_SQLITE_PATH=data/mantsent.sqlite
 ```
 
-Each Telegram chat maps to a scope like `telegram:518819057`, so one operator can deploy an agent, set wallets, commit a policy, and enable monitoring without overwriting another operator's session. The live monitor scans every active scope independently and routes alerts back to the owning Telegram chat, or to `TELEGRAM_ADMIN_CHAT_IDS` when admin IDs are configured.
+Each Telegram chat maps to a scope like `telegram:518819057`, so one operator can deploy an agent, set wallets, commit a policy, and enable monitoring without overwriting another operator's session. The live monitor scans every active scope independently and routes alerts back to the owning Telegram chat, or to `TELEGRAM_ADMIN_CHAT_IDS` when admin IDs are configured. In Telegram, `/session` shows the current scope, backend, wallet count, policy state, monitor state, and last scanned block.
 
 For hosted deployments, keep the SQLite file on a persistent volume. If the provider has no persistent disk, use JSON/SQLite only for demos and migrate the same scoped state model to managed Postgres after the hackathon.
 
@@ -111,6 +111,7 @@ Then message the bot configured by `TELEGRAM_BOT_TOKEN`:
 /policy Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.
 /monitor
 /brief
+/session
 /proof
 ```
 
@@ -147,6 +148,8 @@ Curated wallet labels can be provided through `MANTSENT_ENTITY_LABELS`. Operator
 Every policy match can commit an `AlertCommitted` proof to the Mantle Signal Ledger. Operator outcomes can commit `OutcomeRecorded` and are retained as local feedback examples for future agent explanations.
 
 Monitor health is recorded in state and shown in Telegram plus the dashboard: last scanned block, last check time, and last error. `npm run check` includes parser coverage and monitor fixture coverage for native watchlists, burst windows, curated labels, and known-contract interactions.
+
+`GET /api/health` returns a non-secret deployment probe with service status, chain id, state backend, active monitor scope count, Telegram configuration status, and proof-ledger configuration status.
 
 ## Project Map
 
