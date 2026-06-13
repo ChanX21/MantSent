@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { extname, join, normalize, relative } from "node:path";
 import type { ActionPayload, RuntimeEnv } from "../../shared/types.js";
 import type { ActionService } from "../actions/action-service.js";
+import { activeMonitorScopes } from "../state/store.js";
 import type { TelegramService } from "../telegram/telegram-service.js";
 import type { TelegramUpdate } from "../telegram/telegram-service.js";
 
@@ -27,6 +28,7 @@ export function createRequestHandler({ env, actions, telegram }: { env: RuntimeE
 
     try {
       if (url.pathname === "/api/state") return json(res, 200, actions.state());
+      if (url.pathname === "/api/health") return json(res, 200, healthPayload(env));
       if (url.pathname === "/agent-metadata.json") return json(res, 200, agentMetadata(actions));
       if (url.pathname === "/api/action" && req.method === "POST") {
         if (!isAuthorized(req, env)) return json(res, 401, { error: "Unauthorized" });
@@ -44,6 +46,18 @@ export function createRequestHandler({ env, actions, telegram }: { env: RuntimeE
     }
 
     serveStatic(url, res);
+  };
+}
+
+function healthPayload(env: RuntimeEnv): unknown {
+  return {
+    ok: true,
+    service: "mantsent",
+    chainId: env.MANTLE_CHAIN_ID || null,
+    stateBackend: env.MANTSENT_STATE_BACKEND || process.env.MANTSENT_STATE_BACKEND || "json",
+    activeMonitorScopes: activeMonitorScopes().length,
+    telegramConfigured: Boolean(env.TELEGRAM_BOT_TOKEN),
+    proofsConfigured: Boolean(env.MANTSENT_SIGNAL_LEDGER),
   };
 }
 
