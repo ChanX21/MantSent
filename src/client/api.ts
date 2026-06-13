@@ -8,7 +8,7 @@ const demoPolicy = "Alert me if more than 10 MNT leaves this wallet, especially 
 
 export async function loadRemoteState(): Promise<void> {
   try {
-    const response = await fetch("api/state");
+    const response = await fetch(stateUrl());
     if (!response.ok) throw new Error("backend unavailable");
     applyRemoteState((await response.json()) as PublicState);
     state.online = true;
@@ -16,6 +16,18 @@ export async function loadRemoteState(): Promise<void> {
     state.online = false;
   }
   render();
+}
+
+function stateUrl(): string {
+  const current = new URL(window.location.href);
+  const state = new URL("api/state", current.origin);
+  const scope = current.searchParams.get("scope");
+  const token = current.searchParams.get("token");
+  if (scope && token) {
+    state.searchParams.set("scope", scope);
+    state.searchParams.set("token", token);
+  }
+  return state.toString();
 }
 
 export async function callAction(action: ActionName): Promise<void> {
