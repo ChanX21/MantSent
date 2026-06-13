@@ -6,6 +6,7 @@ import {
   concentrationPanel,
   dataCoverage,
   metric,
+  panelTitle,
   proofTimeline,
   reasonCodePanel,
   scoreDistribution,
@@ -15,7 +16,7 @@ import {
   sparkBars,
   statusBadge,
 } from "./components.js";
-import { cls, escapeHtml } from "./format.js";
+import { cls } from "./format.js";
 import { agent, setupProgress, state } from "./state.js";
 import type { AnalyticsSummary } from "./analytics.js";
 
@@ -30,20 +31,17 @@ export function analyticsDashboardView(): string {
     <main id="dashboard" class="analytics-dashboard">
       <section class="kpi-grid" aria-label="MantSent analytics summary">
         ${analyticsCard("Treasury monitor", state.monitorActive ? "Live" : "Off", monitorDetail(), state.monitorLastError ? "danger" : state.monitorActive ? "good" : "warn")}
-        ${analyticsCard("Watchlist", watchedWalletCount ? `${watchedWalletCount} wallets` : "Not set", walletProfile ? `${walletProfile.label || "Labelled wallet"} · ${walletProfile.category || "custom"}` : "Use /watch or /watch_add in Telegram", watchedWalletCount ? "good" : "warn")}
-        ${analyticsCard("Policy", policyTitle(), state.policyActive ? policyDetail() : "Use /policy in Telegram", state.policyActive ? "good" : "warn")}
-        ${analyticsCard("Investor signal", `${analytics.peakScore}/100`, analytics.totalSignals ? `Weighted risk ${analytics.weightedRiskScore}/100` : "Awaiting first signal", analytics.peakScore >= 80 ? "danger" : analytics.peakScore >= 60 ? "warn" : "neutral")}
-        ${analyticsCard("Data coverage", `${analytics.realSignals} real`, `${analytics.erc20Signals} ERC-20 · ${analytics.nativeSignals} native`, analytics.realSignals ? "good" : "neutral")}
-        ${analyticsCard("Review quality", `${analytics.reviewRate}%`, `${analytics.unresolved} open · ${analytics.suspiciousRate}% suspicious verdict rate`, analytics.unresolved ? "warn" : analytics.totalSignals ? "good" : "neutral")}
+        ${analyticsCard("Watchlist", watchedWalletCount ? `${watchedWalletCount} wallets` : "Not set", walletProfile ? `${walletProfile.label || "Labelled wallet"} · ${walletProfile.category || "custom"}` : "Use /watch or /watch_add in Telegram", watchedWalletCount ? "good" : "warn", "Number and category of wallets currently monitored by the agent.")}
+        ${analyticsCard("Policy", policyTitle(), state.policyActive ? policyDetail() : "Use /policy in Telegram", state.policyActive ? "good" : "warn", "Active operator rule that determines which Mantle wallet events become alerts.")}
+        ${analyticsCard("Investor signal", `${analytics.peakScore}/100`, analytics.totalSignals ? `Weighted risk ${analytics.weightedRiskScore}/100` : "Awaiting first signal", analytics.peakScore >= 80 ? "danger" : analytics.peakScore >= 60 ? "warn" : "neutral", "Highest signal score and risk-weighted context for investor review.")}
+        ${analyticsCard("Data coverage", `${analytics.realSignals} real`, `${analytics.erc20Signals} ERC-20 · ${analytics.nativeSignals} native`, analytics.realSignals ? "good" : "neutral", "How much displayed activity is backed by real Mantle transactions and which asset types are represented.")}
+        ${analyticsCard("Review quality", `${analytics.reviewRate}%`, `${analytics.unresolved} open · ${analytics.suspiciousRate}% suspicious verdict rate`, analytics.unresolved ? "warn" : analytics.totalSignals ? "good" : "neutral", "How much of the alert set has received a human operator outcome label.")}
       </section>
 
       <section class="dashboard-grid">
         <article class="chart-panel wide">
           <div class="panel-head">
-            <div>
-              <span class="eyebrow">Treasury risk</span>
-              <h2>Investor signal flow</h2>
-            </div>
+            ${panelTitle("Treasury risk", "Investor signal flow", "Readiness, recent signal activity, and core alert counts in one operational view.")}
             <span class="pill ${cls(state.online)}">Backend ${state.online ? "online" : "offline"}</span>
           </div>
           <div class="risk-canvas">
@@ -55,49 +53,37 @@ export function analyticsDashboardView(): string {
             ${sparkBars(analytics.activityBuckets)}
           </div>
           <div class="metric-strip">
-            ${metric("Total signals", analytics.totalSignals)}
-            ${metric("Unresolved", analytics.unresolved)}
-            ${metric("Suspicious", analytics.suspicious)}
-            ${metric("Real tx", analytics.realSignals)}
+            ${metric("Total signals", analytics.totalSignals, "Total number of incidents currently returned by the backend state.")}
+            ${metric("Unresolved", analytics.unresolved, "Signals that still need an operator outcome label.")}
+            ${metric("Suspicious", analytics.suspicious, "Signals that the operator marked as suspicious activity.")}
+            ${metric("Real tx", analytics.realSignals, "Signals backed by actual Mantle transaction data.")}
           </div>
         </article>
 
         <article class="chart-panel">
           <div class="panel-head compact">
-            <div>
-              <span class="eyebrow">Alpha radar</span>
-              <h2>Signal quality</h2>
-            </div>
+            ${panelTitle("Alpha radar", "Signal quality", "Score statistics that show how intense and review-worthy the current signal set is.")}
           </div>
           ${alphaRadar(analytics)}
         </article>
 
         <article class="chart-panel">
           <div class="panel-head compact">
-            <div>
-              <span class="eyebrow">Data source</span>
-              <h2>Mantle coverage</h2>
-            </div>
+            ${panelTitle("Data source", "Mantle coverage", "Breakdown of native MNT, ERC-20, contract, and real-chain signal coverage.")}
           </div>
           ${dataCoverage(analytics)}
         </article>
 
         <article class="chart-panel">
           <div class="panel-head compact">
-            <div>
-              <span class="eyebrow">Statistical depth</span>
-              <h2>Score distribution</h2>
-            </div>
+            ${panelTitle("Statistical depth", "Score distribution", "Buckets showing where signal scores fall across the 0 to 100 range.")}
           </div>
           ${scoreDistribution(analytics)}
         </article>
 
         <aside class="chart-panel">
           <div class="panel-head compact">
-            <div>
-              <span class="eyebrow">Operator workflow</span>
-              <h2>Telegram control plane</h2>
-            </div>
+            ${panelTitle("Operator workflow", "Telegram control plane", "Commands used to configure wallets, policies, monitoring, and briefs from Telegram.")}
           </div>
           <p class="panel-copy">Primary actions live in Telegram. The website is a read-only signal surface for the active treasury watchlist.</p>
           <div class="command-grid">
@@ -112,56 +98,41 @@ export function analyticsDashboardView(): string {
 
         <article class="chart-panel">
           <div class="panel-head compact">
-            <div>
-              <span class="eyebrow">Agent</span>
-              <h2>${escapeHtml(agent.name, "MantSent Agent")}</h2>
-            </div>
+            ${panelTitle("Agent", agent.name || "MantSent Agent", "Current monitoring agent identity, AI provider, and health indicators.")}
           </div>
           <div class="status-stack">
-            ${statusBadge("Agent ID", `#${agent.id}`, state.agentCreated ? "good" : "warn")}
-            ${statusBadge("Identity", agent.identityStatus === "erc8004-registered" ? "ERC-8004 registered" : "Local profile", agent.identityStatus === "erc8004-registered" ? "good" : "warn")}
-            ${statusBadge("AI", aiLabel(), state.openAiConfigured ? "good" : "neutral")}
-            ${statusBadge("Monitor health", monitorHealthLabel(analytics), state.monitorLastError || analytics.isMonitorStale ? "warn" : state.monitorLastCheckedAt ? "good" : "neutral")}
-            ${statusBadge("Latest signal age", analytics.latestAgeMinutes === null ? "Pending" : `${analytics.latestAgeMinutes}m`, analytics.latestAgeMinutes !== null && analytics.latestAgeMinutes <= 60 ? "good" : "neutral")}
+            ${statusBadge("Agent ID", `#${agent.id}`, state.agentCreated ? "good" : "warn", "Identifier for the currently configured MantSent monitoring agent.")}
+            ${statusBadge("Identity", agent.identityStatus === "erc8004-registered" ? "ERC-8004 registered" : "Local profile", agent.identityStatus === "erc8004-registered" ? "good" : "warn", "Shows whether the agent is registered on ERC-8004 or still local-only.")}
+            ${statusBadge("AI", aiLabel(), state.openAiConfigured ? "good" : "neutral", "Explanation provider used for alert summaries and reasoning.")}
+            ${statusBadge("Monitor health", monitorHealthLabel(analytics), state.monitorLastError || analytics.isMonitorStale ? "warn" : state.monitorLastCheckedAt ? "good" : "neutral", "Freshness of the polling loop and whether recent checks have errored or gone stale.")}
+            ${statusBadge("Latest signal age", analytics.latestAgeMinutes === null ? "Pending" : `${analytics.latestAgeMinutes}m`, analytics.latestAgeMinutes !== null && analytics.latestAgeMinutes <= 60 ? "good" : "neutral", "Minutes since the newest signal in the incident list was created.")}
           </div>
         </article>
 
         <article class="chart-panel">
           <div class="panel-head compact">
-            <div>
-              <span class="eyebrow">Methodology</span>
-              <h2>Signal taxonomy</h2>
-            </div>
+            ${panelTitle("Methodology", "Signal taxonomy", "Counts and percentages for each signal category classified by the monitor.")}
           </div>
           ${signalTaxonomy(analytics)}
         </article>
 
         <article class="chart-panel">
           <div class="panel-head compact">
-            <div>
-              <span class="eyebrow">Concentration</span>
-              <h2>Wallet and recipient exposure</h2>
-            </div>
+            ${panelTitle("Concentration", "Wallet and recipient exposure", "Shows whether signals are concentrated around a small set of wallets or counterparties.")}
           </div>
           ${concentrationPanel(analytics)}
         </article>
 
         <article class="chart-panel">
           <div class="panel-head compact">
-            <div>
-              <span class="eyebrow">Decision factors</span>
-              <h2>Reason-code statistics</h2>
-            </div>
+            ${panelTitle("Decision factors", "Reason-code statistics", "Policy-engine reason codes explaining why alerts were generated.")}
           </div>
           ${reasonCodePanel(analytics)}
         </article>
 
         <article class="chart-panel wide">
           <div class="panel-head">
-            <div>
-              <span class="eyebrow">Investor signals</span>
-              <h2>Signals and outcomes</h2>
-            </div>
+            ${panelTitle("Investor signals", "Signals and outcomes", "Latest alert and detailed incident table with scores, labels, amounts, and evidence.")}
             <span class="pill">${analytics.totalSignals ? "Live ledger view" : "No incidents yet"}</span>
           </div>
           ${latest ? alertCard(latest) : noAlertState()}
@@ -170,30 +141,21 @@ export function analyticsDashboardView(): string {
 
         <article class="chart-panel">
           <div class="panel-head compact">
-            <div>
-              <span class="eyebrow">Setup health</span>
-              <h2>Readiness</h2>
-            </div>
+            ${panelTitle("Setup health", "Readiness", "Checklist for the agent, identity, wallet, policy, and monitor prerequisites.")}
           </div>
           ${setupChecklist()}
         </article>
 
         <article class="chart-panel">
           <div class="panel-head compact">
-            <div>
-              <span class="eyebrow">Verifiability</span>
-              <h2>Proof timeline</h2>
-            </div>
+            ${panelTitle("Verifiability", "Proof timeline", "Proof checkpoints for identity, policy, alert, and human outcome events.")}
           </div>
           ${proofTimeline()}
         </article>
 
         <article class="chart-panel">
           <div class="panel-head compact">
-            <div>
-              <span class="eyebrow">Product scope</span>
-              <h2>Operator scope</h2>
-            </div>
+            ${panelTitle("Product scope", "Operator scope", "Clarifies that this build is a single-operator monitoring surface, not a multi-tenant SaaS yet.")}
           </div>
           <p class="panel-copy">This build is intentionally scoped to one authorized operator managing a labelled treasury watchlist.</p>
           <div class="scope-box">
