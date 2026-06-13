@@ -290,6 +290,12 @@ export function createTelegramService({
           text: sessionText(scopeId, actions.state(scopeId)),
           parse_mode: "HTML",
         });
+      } else if (command === "/health") {
+        await call("sendMessage", {
+          chat_id: chatId,
+          text: healthText(actions.state(scopeId)),
+          parse_mode: "HTML",
+        });
       } else if (command === "/label") {
         if (!args) {
           await call("sendMessage", {
@@ -365,7 +371,7 @@ export function createTelegramService({
         await call("sendMessage", {
           chat_id: chatId,
           text:
-            `<b>Commands</b>\n/deploy [agent name]\n/register [agentURI]\n/groq gsk-... [model]\n/openai sk-... [model]\n/watch 0x...\n/watch_add 0x... | Label | treasury | high\n/watch_remove 0x...\n/watchlist\n/label Treasury Ops | treasury | high\n/policies\n/policy alert me if more than 10 MNT leaves\n/monitor\n/expected\n/suspicious\n/brief\n/session\n/proof\n/reset\n/redeploy${demoMode ? "\n/demo" : ""}`,
+            `<b>Commands</b>\n/deploy [agent name]\n/register [agentURI]\n/groq gsk-... [model]\n/openai sk-... [model]\n/watch 0x...\n/watch_add 0x... | Label | treasury | high\n/watch_remove 0x...\n/watchlist\n/label Treasury Ops | treasury | high\n/policies\n/policy alert me if more than 10 MNT leaves\n/monitor\n/expected\n/suspicious\n/brief\n/session\n/health\n/proof\n/reset\n/redeploy${demoMode ? "\n/demo" : ""}`,
           parse_mode: "HTML",
         });
       }
@@ -471,7 +477,7 @@ function isAuthorizedChat(chatId: number, adminChats: Set<number>): boolean {
 }
 
 function isReadOnlyCommand(command?: string): boolean {
-  return !command || ["/start", "/proof", "/incidents", "/watchlist", "/policies", "/brief", "/session", "/help"].includes(command);
+  return !command || ["/start", "/proof", "/incidents", "/watchlist", "/policies", "/brief", "/session", "/health", "/help"].includes(command);
 }
 
 function isReadOnlyCallback(action: string): boolean {
@@ -494,6 +500,7 @@ function commandsFor(demoMode: boolean): TelegramCommand[] {
     { command: "suspicious", description: "Mark latest signal as suspicious" },
     { command: "brief", description: "Show current risk brief" },
     { command: "session", description: "Show operator session and storage status" },
+    { command: "health", description: "Show monitor and proof readiness" },
     { command: "openai", description: "Add an OpenAI key for richer explanations" },
     { command: "groq", description: "Add a Groq key for richer explanations" },
     { command: "proof", description: "Show agent, policy, alert, and outcome proofs" },
@@ -551,6 +558,17 @@ Wallets: ${state.watchedWallets.length ? `${state.watchedWallets.length} watched
 Policy: ${state.policyActive ? "Active" : "Not set"}
 Monitor: ${state.monitorActive ? "Live" : "Off"}
 Latest block: ${state.monitorLastBlock || "Not scanned"}`;
+}
+
+function healthText(state: PublicState): string {
+  return `<b>MantSent Health</b>
+Agent: ${state.agentIdentityStatus === "erc8004-registered" ? "ERC-8004 registered" : "Not registered"}
+AI: ${aiLabel(state)}
+Wallets: ${state.watchedWallets.length ? `${state.watchedWallets.length} watched` : "Not set"}
+Policy: ${state.policyActive ? "Active" : "Not set"}
+Monitor: ${state.monitorActive ? "Live" : "Off"}
+Last check: ${state.monitorLastCheckedAt || "Not checked"}
+Last error: ${state.monitorLastError ? escapeHtml(state.monitorLastError) : "None"}`;
 }
 
 function parseWalletProfileArgs(args: string): { name: string; category: "treasury" | "whale" | "protocol" | "exchange" | "fresh" | "custom"; importance: "low" | "medium" | "high" } {
