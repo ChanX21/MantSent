@@ -197,18 +197,6 @@ Debug from the boundary first: frontend issues start at `src/client/api.ts`; Tel
 
 For the fuller engineering map, see `docs/ARCHITECTURE.md`.
 
-## Judging Positioning
-
-For the Mantle general criteria, MantSent demonstrates a real Mantle Sepolia contract, deterministic monitoring, ERC-8004 agent registration flow, Telegram operator UX, and a Mantle-themed analytics interface.
-
-For the Mirana Alpha & Data track, MantSent is positioned as wallet-risk and alpha-signal infrastructure: it turns native and ERC-20 wallet movement plus configured bridge/router/contract interactions into scored, explainable, auditable signals that a sophisticated investor can use to monitor treasury, whale, protocol, or exchange wallets.
-
-See `docs/JUDGING.md` for the scorecard mapping and demo script.
-
-See `docs/DEPLOYMENT.md` for non-AWS hackathon deployment notes.
-See `docs/OPERATIONS.md` for reset, backup, migration, and health-check steps.
-See `docs/SHIPPING_AWARD_CHECKLIST.md` for deployment milestone award readiness.
-
 ## Guardrails
 
 MantSent reports policy-based anomaly signals. It does not claim theft detection, custody protection, guaranteed alpha, or trading advice. The UI uses operator-confirmed outcomes as feedback data, not as proof of model accuracy.
