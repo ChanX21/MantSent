@@ -1,9 +1,9 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
-import type { ActionName, PublicState } from "../../shared/types.js";
+import type { ActionName, ActionPayload, PublicState } from "../../shared/types.js";
 import type { ActionService } from "../actions/action-service.js";
-import { mutateState } from "../state/store.js";
+import { mutateState, scopeIdForTelegramChat } from "../state/store.js";
 import { mantleTxUrl } from "../../shared/explorer.js";
 import { defaultMantleLogoUrl, defaultTelegramImagePath, mantleProofTagline, telegramIntroCaption } from "../../shared/branding.js";
 
@@ -95,8 +95,12 @@ export function createTelegramService({
     return payload.result;
   }
 
+  function runAction(scopeId: string, action: ActionName, payload: ActionPayload = {}): Promise<PublicState> | PublicState {
+    return actions.run(action, { ...payload, scopeId });
+  }
+
   async function sendStatus(chatId: number): Promise<void> {
-    const state = actions.state();
+    const state = actions.state(scopeIdForTelegramChat(chatId));
     const keyboard = isAuthorizedChat(chatId, adminChats) ? actionKeyboardFor(state) : undefined;
     await call("sendMessage", {
       chat_id: chatId,
@@ -117,17 +121,18 @@ export function createTelegramService({
     const chatId = update.message?.chat?.id || update.callback_query?.message?.chat?.id;
     if (!chatId) return;
 
-    rememberChat(chatId);
+    const scopeId = scopeIdForTelegramChat(chatId);
+    rememberChat(chatId, scopeId);
 
     if (update.callback_query) {
-      await handleCallback(update.callback_query, chatId);
+      await handleCallback(update.callback_query, chatId, scopeId);
       return;
     }
 
-    if (update.message) await handleMessage(update.message, chatId);
+    if (update.message) await handleMessage(update.message, chatId, scopeId);
   }
 
-  async function handleCallback(callback: NonNullable<TelegramUpdate["callback_query"]>, chatId: number): Promise<void> {
+  async function handleCallback(callback: NonNullable<TelegramUpdate["callback_query"]>, chatId: number, scopeId: string): Promise<void> {
     await call("answerCallbackQuery", { callback_query_id: callback.id });
     const action = callback.data;
     if (!isReadOnlyCallback(action) && !isAuthorizedChat(chatId, adminChats)) {
@@ -151,12 +156,12 @@ export function createTelegramService({
         parse_mode: "HTML",
       });
     }
-    else if (action === "watch_demo" && demoMode) await actions.run("watch", { address: demoWallet });
-    else if (action === "policy_demo" && demoMode) await actions.run("policy", { text: demoPolicy });
-    else if (action === "transfer_demo" && demoMode) await actions.run("transfer", {});
-    else if (action === "monitor_on") await actions.run("monitor", {});
-    else if (action === "register_agent") await actions.run("register_agent", {});
-    else if (action === "deploy_agent") await actions.run("deploy_agent", {});
+    else if (action === "watch_demo" && demoMode) await runAction(scopeId, "watch", { address: demoWallet });
+    else if (action === "policy_demo" && demoMode) await runAction(scopeId, "policy", { text: demoPolicy });
+    else if (action === "transfer_demo" && demoMode) await runAction(scopeId, "transfer");
+    else if (action === "monitor_on") await runAction(scopeId, "monitor");
+    else if (action === "register_agent") await runAction(scopeId, "register_agent");
+    else if (action === "deploy_agent") await runAction(scopeId, "deploy_agent");
     else if (action === "ai_setup") {
       await call("sendMessage", { chat_id: chatId, text: aiSetupText, parse_mode: "HTML" });
     }
@@ -164,12 +169,12 @@ export function createTelegramService({
       await call("sendMessage", { chat_id: chatId, text: setupText, parse_mode: "HTML" });
     }
     else if (action === "proof") await sendStatus(chatId);
-    else await actions.run(action as ActionName, {});
+    else await runAction(scopeId, action as ActionName);
 
     await sendStatus(chatId);
   }
 
-  async function handleMessage(message: NonNullable<TelegramUpdate["message"]>, chatId: number): Promise<void> {
+  async function handleMessage(message: NonNullable<TelegramUpdate["message"]>, chatId: number, scopeId: string): Promise<void> {
     const text = message.text || "";
     const [command, ...rest] = text.trim().split(/\s+/);
     const args = rest.join(" ");
@@ -181,15 +186,15 @@ export function createTelegramService({
       } else if (!isReadOnlyCommand(command) && !isAuthorizedChat(chatId, adminChats)) {
         await sendUnauthorized(chatId);
       } else if (isWalletAddress(text)) {
-        await actions.run("watch", { address: text.trim() });
+        await runAction(scopeId, "watch", { address: text.trim() });
         await call("sendMessage", {
           chat_id: chatId,
           text: "<b>Wallet connected.</b>\nNow set the policy that should trigger alerts.",
           parse_mode: "HTML",
         });
         await sendStatus(chatId);
-      } else if (!command?.startsWith("/") && looksLikePolicy(text) && actions.state().walletWatched) {
-        await securePolicy(chatId, text.trim());
+      } else if (!command?.startsWith("/") && looksLikePolicy(text) && actions.state(scopeId).walletWatched) {
+        await securePolicy(chatId, scopeId, text.trim());
       } else if (command === "/create") {
         await call("sendMessage", {
           chat_id: chatId,
@@ -202,11 +207,11 @@ export function createTelegramService({
           text: "<b>Deploying agent identity.</b>\nCreating the local profile and registering it through ERC-8004 on Mantle.",
           parse_mode: "HTML",
         });
-        await actions.run("deploy_agent", { name: args || undefined });
+        await runAction(scopeId, "deploy_agent", { name: args || undefined });
         await sendStatus(chatId);
       } else if (command === "/register") {
         await call("sendMessage", { chat_id: chatId, text: "<b>Registering ERC-8004 agent on Mantle.</b>\nThis can take a moment.", parse_mode: "HTML" });
-        await actions.run("register_agent", { agentUri: args || undefined });
+        await runAction(scopeId, "register_agent", { agentUri: args || undefined });
         await sendStatus(chatId);
       } else if (command === "/openai") {
         const [apiKey, model] = args.split(/\s+/);
@@ -214,7 +219,7 @@ export function createTelegramService({
           await call("sendMessage", { chat_id: chatId, text: aiSetupText, parse_mode: "HTML" });
           return;
         }
-        await actions.run("configure_ai", { provider: "openai", apiKey, model });
+        await runAction(scopeId, "configure_ai", { provider: "openai", apiKey, model });
         await call("sendMessage", { chat_id: chatId, text: "<b>OpenAI agent explanations enabled.</b>\nFuture alerts will use the configured OpenAI model.", parse_mode: "HTML" });
         await sendStatus(chatId);
       } else if (command === "/groq") {
@@ -223,7 +228,7 @@ export function createTelegramService({
           await call("sendMessage", { chat_id: chatId, text: aiSetupText, parse_mode: "HTML" });
           return;
         }
-        await actions.run("configure_ai", { provider: "groq", apiKey, model });
+        await runAction(scopeId, "configure_ai", { provider: "groq", apiKey, model });
         await call("sendMessage", { chat_id: chatId, text: "<b>Groq agent explanations enabled.</b>\nFuture alerts will use the configured Groq model.", parse_mode: "HTML" });
         await sendStatus(chatId);
       } else if (command === "/watch") {
@@ -231,7 +236,7 @@ export function createTelegramService({
           await promptForWallet(chatId);
           return;
         }
-        await actions.run("watch", { address: args });
+        await runAction(scopeId, "watch", { address: args });
         await call("sendMessage", {
           chat_id: chatId,
           text: "<b>Wallet connected.</b>\nNext, send a monitoring policy.",
@@ -248,7 +253,7 @@ export function createTelegramService({
           return;
         }
         const profile = parseWatchAddArgs(args);
-        await actions.run("watch_add", profile);
+        await runAction(scopeId, "watch_add", profile);
         await call("sendMessage", { chat_id: chatId, text: "<b>Wallet added to watchlist.</b>\nThe live monitor will evaluate matching activity for this wallet.", parse_mode: "HTML" });
         await sendStatus(chatId);
       } else if (command === "/watch_remove") {
@@ -260,13 +265,13 @@ export function createTelegramService({
           });
           return;
         }
-        await actions.run("watch_remove", { address: args.trim().split(/\s+/)[0] });
+        await runAction(scopeId, "watch_remove", { address: args.trim().split(/\s+/)[0] });
         await call("sendMessage", { chat_id: chatId, text: "<b>Wallet removed from watchlist.</b>", parse_mode: "HTML" });
         await sendStatus(chatId);
       } else if (command === "/watchlist") {
         await call("sendMessage", {
           chat_id: chatId,
-          text: watchlistText(actions.state()),
+          text: watchlistText(actions.state(scopeId)),
           parse_mode: "HTML",
           disable_web_page_preview: true,
         });
@@ -275,7 +280,7 @@ export function createTelegramService({
       } else if (command === "/brief") {
         await call("sendMessage", {
           chat_id: chatId,
-          text: briefText(actions.state()),
+          text: briefText(actions.state(scopeId)),
           parse_mode: "HTML",
           disable_web_page_preview: true,
         });
@@ -290,7 +295,7 @@ export function createTelegramService({
           return;
         }
         const profile = parseWalletProfileArgs(args);
-        await actions.run("watchlist", profile);
+        await runAction(scopeId, "watchlist", profile);
         await call("sendMessage", { chat_id: chatId, text: "<b>Wallet profile updated.</b>\nFuture signals will use this label in scoring.", parse_mode: "HTML" });
         await sendStatus(chatId);
       } else if (command === "/policy") {
@@ -298,11 +303,11 @@ export function createTelegramService({
           await promptForPolicy(chatId);
           return;
         }
-        if (!actions.state().walletWatched) {
+        if (!actions.state(scopeId).walletWatched) {
           await promptForWallet(chatId);
           return;
         }
-        await securePolicy(chatId, args);
+        await securePolicy(chatId, scopeId, args);
       } else if (command === "/simulate" || command === "/demo") {
         if (!demoMode) {
           await call("sendMessage", {
@@ -313,10 +318,10 @@ export function createTelegramService({
           return;
         }
         await call("sendMessage", { chat_id: chatId, text: "<b>Demo simulation only.</b>\nSecuring a demo alert proof on Mantle. This does not represent a live wallet transfer.", parse_mode: "HTML" });
-        await actions.run("transfer", {});
+        await runAction(scopeId, "transfer");
         await sendStatus(chatId);
       } else if (command === "/monitor") {
-        const state = actions.state();
+        const state = actions.state(scopeId);
         if (!state.walletWatched) {
           await promptForWallet(chatId);
           return;
@@ -325,7 +330,7 @@ export function createTelegramService({
           await promptForPolicy(chatId);
           return;
         }
-        await actions.run("monitor", {});
+        await runAction(scopeId, "monitor");
         await call("sendMessage", {
           chat_id: chatId,
           text: "<b>Mantle monitor enabled.</b>\nConfirmed native MNT transactions and ERC-20 Transfer logs will be evaluated against the active policy.",
@@ -333,20 +338,20 @@ export function createTelegramService({
         });
         await sendStatus(chatId);
       } else if (command === "/expected") {
-        await actions.run("expected");
+        await runAction(scopeId, "expected");
         await call("sendMessage", { chat_id: chatId, text: "<b>Outcome recorded.</b>\nMarked as expected transfer.", parse_mode: "HTML" });
         await sendStatus(chatId);
       } else if (command === "/suspicious") {
-        await actions.run("suspicious");
+        await runAction(scopeId, "suspicious");
         await call("sendMessage", { chat_id: chatId, text: "<b>Outcome recorded.</b>\nMarked as suspicious activity.", parse_mode: "HTML" });
         await sendStatus(chatId);
       } else if (command === "/reset") {
-        await actions.run("reset");
+        await runAction(scopeId, "reset");
         await call("sendMessage", { chat_id: chatId, text: "<b>MantSent session reset.</b>\nUse <code>/deploy My Agent Name</code> to start again.", parse_mode: "HTML" });
         await sendStatus(chatId);
       } else if (command === "/redeploy") {
-        await actions.run("reset");
-        await actions.run("create");
+        await runAction(scopeId, "reset");
+        await runAction(scopeId, "create");
         await sendStatus(chatId);
       } else if (command === "/incidents" || command === "/proof") {
         await sendStatus(chatId);
@@ -438,9 +443,9 @@ export function createTelegramService({
     });
   }
 
-  async function securePolicy(chatId: number, policy: string): Promise<void> {
+  async function securePolicy(chatId: number, scopeId: string, policy: string): Promise<void> {
     await call("sendMessage", { chat_id: chatId, text: "<b>Securing policy proof on Mantle.</b>\nThis can take a moment.", parse_mode: "HTML" });
-    await actions.run("policy", { text: policy });
+    await runAction(scopeId, "policy", { text: policy });
     await call("sendMessage", { chat_id: chatId, text: "<b>Policy active.</b>\nEnable live monitoring when ready.", parse_mode: "HTML" });
     await sendStatus(chatId);
   }
@@ -571,10 +576,10 @@ function looksLikePolicy(value: string): boolean {
   return /\b(alert|notify|flag|monitor|if|when|transaction|transfer|mnt|outflow)\b/i.test(value) && value.trim().length > 12;
 }
 
-function rememberChat(chatId: number): void {
+function rememberChat(chatId: number, scopeId: string): void {
   mutateState((state) => {
     if (!state.chatIds.includes(chatId)) state.chatIds.push(chatId);
-  });
+  }, scopeId);
 }
 
 function statusText(state: PublicState, chainId?: string): string {
