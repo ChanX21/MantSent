@@ -174,6 +174,7 @@ export interface RuntimeEnv {
   TELEGRAM_ADMIN_CHAT_IDS?: string;
   MANTSENT_API_ADMIN_TOKEN?: string;
   MANTSENT_DASHBOARD_SECRET?: string;
+  MANTSENT_DASHBOARD_BASE_URL?: string;
   PASSPORT_BASE_URL?: string;
   MANTLE_LOGO_URL?: string;
   MANTLE_TELEGRAM_IMAGE_PATH?: string;

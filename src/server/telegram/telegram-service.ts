@@ -12,13 +12,14 @@ const demoWallet = "0x7f2c2fbb1d2e4b6e6f8e45b902399d8a3c02a91e";
 const demoPolicy = "Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.";
 const setupText =
   "<b>Set up treasury monitoring</b>\n" +
-  "1. <code>/deploy My Agent Name</code>\n" +
-  "2. <code>/groq gsk-... llama-3.1-8b-instant</code> optional\n" +
-  "3. <code>/watch 0xYourMantleWallet</code>\n" +
+  "1. <code>/dashboard</code> opens your scoped analytics link\n" +
+  "2. <code>/deploy My Agent Name</code>\n" +
+  "3. <code>/groq gsk-... llama-3.1-8b-instant</code> optional\n" +
+  "4. <code>/watch 0xYourMantleWallet</code>\n" +
   "   Add more with <code>/watch_add 0x... | Label | treasury | high</code>\n" +
-  "4. <code>/label Treasury Ops | treasury | high</code>\n" +
-  "5. <code>/policy Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.</code>\n" +
-  "6. <code>/monitor</code>";
+  "5. <code>/label Treasury Ops | treasury | high</code>\n" +
+  "6. <code>/policy Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.</code>\n" +
+  "7. <code>/monitor</code>";
 const samplePolicyText =
   "<b>Sample policies</b>\n" +
   "<code>/policy Alert me if any outgoing transaction happens</code>\n" +
@@ -186,6 +187,7 @@ export function createTelegramService({
     try {
       if (command === "/start") {
         await sendMantleIntro(chatId);
+        await sendDashboardLink(chatId, scopeId);
         await sendStatus(chatId);
       } else if (!isReadOnlyCommand(command) && !isAuthorizedChat(chatId, adminChats)) {
         await sendUnauthorized(chatId);
@@ -301,12 +303,7 @@ export function createTelegramService({
           parse_mode: "HTML",
         });
       } else if (command === "/dashboard") {
-        await call("sendMessage", {
-          chat_id: chatId,
-          text: dashboardText({ ...dashboardEnv }, scopeId),
-          parse_mode: "HTML",
-          disable_web_page_preview: true,
-        });
+        await sendDashboardLink(chatId, scopeId);
       } else if (command === "/label") {
         if (!args) {
           await call("sendMessage", {
@@ -472,6 +469,15 @@ export function createTelegramService({
     await call("sendMessage", { chat_id: chatId, text: "<b>Policy active.</b>\nEnable live monitoring when ready.", parse_mode: "HTML" });
     await sendStatus(chatId);
   }
+
+  async function sendDashboardLink(chatId: number, scopeId: string): Promise<void> {
+    await call("sendMessage", {
+      chat_id: chatId,
+      text: dashboardText({ ...dashboardEnv }, scopeId),
+      parse_mode: "HTML",
+      disable_web_page_preview: true,
+    });
+  }
 }
 
 function parseAdminChatIds(value?: string): Set<number> {
@@ -586,8 +592,7 @@ Last error: ${state.monitorLastError ? escapeHtml(state.monitorLastError) : "Non
 function dashboardText(env: Record<string, string | undefined>, scopeId: string): string {
   const url = dashboardUrl({ ...process.env, ...env }, scopeId);
   return `<b>MantSent Analytics</b>
-Open your scoped dashboard:
-${escapeHtml(url)}
+<a href="${escapeHtml(url)}">Open your scoped dashboard</a>
 
 This link is scoped to your Telegram session. Do not post it publicly.`;
 }

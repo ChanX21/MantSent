@@ -16,7 +16,7 @@ Use:
 MANTSENT_STATE_BACKEND=sqlite
 MANTSENT_SQLITE_PATH=data/mantsent.sqlite
 MANTSENT_DASHBOARD_SECRET=long-random-dashboard-secret
-PASSPORT_BASE_URL=https://your-railway-domain.up.railway.app
+MANTSENT_DASHBOARD_BASE_URL=https://your-public-app-domain
 ```
 
 Run command:

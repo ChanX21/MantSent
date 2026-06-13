@@ -28,8 +28,10 @@ Scoped dashboard links are signed with `MANTSENT_DASHBOARD_SECRET`. If it is not
 
 ```env
 MANTSENT_DASHBOARD_SECRET=long-random-dashboard-secret
-PASSPORT_BASE_URL=https://your-railway-domain.up.railway.app
+MANTSENT_DASHBOARD_BASE_URL=http://localhost:5173
 ```
+
+For deployment, set `MANTSENT_DASHBOARD_BASE_URL` to the public app URL. For local development, keep it as `http://localhost:5173`.
 
 Telegram mutations are restricted to `TELEGRAM_ADMIN_CHAT_IDS`. To find your chat ID, send `/start` to the bot before setting the value; the unauthorized response includes the chat ID to add:
 

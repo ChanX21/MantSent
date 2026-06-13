@@ -38,6 +38,6 @@ function dashboardSecret(env: RuntimeEnv): string {
 }
 
 function publicBaseUrl(env: RuntimeEnv): string {
-  const baseUrl = env.PASSPORT_BASE_URL || env.RAILWAY_PUBLIC_DOMAIN || "http://127.0.0.1:5173";
+  const baseUrl = env.MANTSENT_DASHBOARD_BASE_URL || env.PASSPORT_BASE_URL || env.RAILWAY_PUBLIC_DOMAIN || "http://127.0.0.1:5173";
   return baseUrl.startsWith("http") ? baseUrl : `https://${baseUrl}`;
 }

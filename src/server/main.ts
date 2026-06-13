@@ -32,7 +32,7 @@ const telegram = createTelegramService({
   telegramImagePath: env.MANTLE_TELEGRAM_IMAGE_PATH || defaultTelegramImagePath,
   demoMode: String(env.MANTSENT_ENABLE_DEMO_MODE || "").toLowerCase() === "true",
   adminChatIds: env.TELEGRAM_ADMIN_CHAT_IDS,
-  dashboardBaseUrl: env.PASSPORT_BASE_URL,
+  dashboardBaseUrl: env.MANTSENT_DASHBOARD_BASE_URL || env.PASSPORT_BASE_URL || env.RAILWAY_PUBLIC_DOMAIN,
 });
 const handler = createRequestHandler({ env, actions, telegram });
 
