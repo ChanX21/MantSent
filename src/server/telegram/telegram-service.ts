@@ -45,7 +45,7 @@ interface TelegramResponse<T> {
   description?: string;
 }
 
-type InlineButton = { text: string; callback_data: string };
+type InlineButton = { text: string; callback_data: string } | { text: string; url: string };
 type InlineKeyboard = InlineButton[][];
 type TelegramCommand = { command: string; description: string };
 
@@ -471,11 +471,15 @@ export function createTelegramService({
   }
 
   async function sendDashboardLink(chatId: number, scopeId: string): Promise<void> {
+    const url = dashboardUrl({ ...process.env, ...dashboardEnv }, scopeId);
     await call("sendMessage", {
       chat_id: chatId,
-      text: dashboardText({ ...dashboardEnv }, scopeId),
+      text: dashboardText(url),
       parse_mode: "HTML",
       disable_web_page_preview: true,
+      reply_markup: {
+        inline_keyboard: [[{ text: "Open Dashboard", url }]],
+      },
     });
   }
 }
@@ -589,10 +593,12 @@ Last check: ${state.monitorLastCheckedAt || "Not checked"}
 Last error: ${state.monitorLastError ? escapeHtml(state.monitorLastError) : "None"}`;
 }
 
-function dashboardText(env: Record<string, string | undefined>, scopeId: string): string {
-  const url = dashboardUrl({ ...process.env, ...env }, scopeId);
+function dashboardText(url: string): string {
   return `<b>MantSent Analytics</b>
-<a href="${escapeHtml(url)}">Open your scoped dashboard</a>
+<a href="${escapeHtmlAttribute(url)}">Open your scoped dashboard</a>
+
+Direct link:
+${escapeHtml(url)}
 
 This link is scoped to your Telegram session. Do not post it publicly.`;
 }
@@ -736,6 +742,10 @@ function incidentAmount(incident: PublicState["incidents"][number]): string {
 
 function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function escapeHtmlAttribute(value: string): string {
+  return escapeHtml(value).replace(/"/g, "&quot;");
 }
 
 function formatTelegramExplanation(value: string): string {
