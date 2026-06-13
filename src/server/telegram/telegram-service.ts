@@ -477,9 +477,7 @@ export function createTelegramService({
       text: dashboardText(url),
       parse_mode: "HTML",
       disable_web_page_preview: true,
-      reply_markup: {
-        inline_keyboard: [[{ text: "Open Dashboard", url }]],
-      },
+      reply_markup: dashboardReplyMarkup(url),
     });
   }
 }
@@ -594,6 +592,13 @@ Last error: ${state.monitorLastError ? escapeHtml(state.monitorLastError) : "Non
 }
 
 function dashboardText(url: string): string {
+  if (isLocalDashboardUrl(url)) {
+    return `<b>MantSent Analytics</b>
+Local dashboard link:
+<code>${escapeHtml(url)}</code>
+
+Telegram cannot open localhost links as inline buttons. Copy this link into a browser on the same machine running MantSent, or set <code>MANTSENT_DASHBOARD_BASE_URL</code> to an HTTPS tunnel URL.`;
+  }
   return `<b>MantSent Analytics</b>
 <a href="${escapeHtmlAttribute(url)}">Open your scoped dashboard</a>
 
@@ -601,6 +606,22 @@ Direct link:
 ${escapeHtml(url)}
 
 This link is scoped to your Telegram session. Do not post it publicly.`;
+}
+
+function dashboardReplyMarkup(url: string): { inline_keyboard: InlineKeyboard } | undefined {
+  if (isLocalDashboardUrl(url)) return undefined;
+  return {
+    inline_keyboard: [[{ text: "Open Dashboard", url }]],
+  };
+}
+
+function isLocalDashboardUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return ["localhost", "127.0.0.1", "0.0.0.0", "::1"].includes(url.hostname);
+  } catch {
+    return false;
+  }
 }
 
 function parseWalletProfileArgs(args: string): { name: string; category: "treasury" | "whale" | "protocol" | "exchange" | "fresh" | "custom"; importance: "low" | "medium" | "high" } {
