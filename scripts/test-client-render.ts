@@ -109,6 +109,12 @@ assert.match(populatedHtml, /Treasury Ops · treasury/);
 assert.match(populatedHtml, /Large Native Outflow/);
 assert.match(populatedHtml, /88\/100/);
 assert.match(populatedHtml, /42 MNT/);
+assert.ok((populatedHtml.match(/class="info-tip"/g) || []).length >= 45, "Dashboard should render explanatory tooltips for core data points.");
+assert.match(populatedHtml, /Number and category of wallets currently monitored by the agent\./);
+assert.match(populatedHtml, /Highest signal score and risk-weighted context for investor review\./);
+assert.match(populatedHtml, /Score statistics that show how intense and review-worthy the current signal set is\./);
+assert.match(populatedHtml, /Policy-engine reason codes explaining why alerts were generated\./);
+assert.match(populatedHtml, /Transaction hash or proof reference for verification\./);
 
 for (const broken of ["undefined", "null", "NaN", "[object Object]"]) {
   assert.equal(populatedHtml.includes(broken), false, `Populated dashboard rendered ${broken}`);
