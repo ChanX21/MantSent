@@ -58,8 +58,50 @@ export interface PolicyRule {
   transactionWindowSeconds?: number;
   contractInteraction?: boolean;
   contractTypes?: string[];
+  ast?: PolicyAst;
+  compiledSummary?: string[];
   rawText: string;
 }
+
+export type PolicyComparisonOp = ">" | ">=" | "=";
+
+export type PolicyLogic = "AND" | "OR";
+
+export interface PolicyAst {
+  version: 1;
+  logic: PolicyLogic;
+  conditions: PolicyCondition[];
+}
+
+export type PolicyCondition =
+  | {
+      type: "transfer_amount";
+      asset: "MNT" | "ERC20" | "ANY";
+      tokenSymbol?: string;
+      direction: "incoming" | "outgoing" | "both";
+      op: PolicyComparisonOp;
+      value: number;
+    }
+  | {
+      type: "transaction_count";
+      direction: "incoming" | "outgoing" | "both";
+      op: PolicyComparisonOp;
+      value: number;
+      windowSeconds: number;
+    }
+  | {
+      type: "any_transaction";
+      asset: "MNT" | "ERC20" | "ANY";
+      direction: "incoming" | "outgoing" | "both";
+    }
+  | {
+      type: "new_counterparty";
+      direction: "incoming" | "outgoing" | "both";
+    }
+  | {
+      type: "contract_interaction";
+      contractTypes?: string[];
+    };
 
 export interface MonitoringSkill {
   id: "single-wallet-mnt-outflow-monitor";

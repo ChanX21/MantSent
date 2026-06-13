@@ -1,4 +1,4 @@
-import type { PolicyRule } from "../../shared/types.js";
+import type { PolicyAst, PolicyComparisonOp, PolicyCondition, PolicyLogic, PolicyRule } from "../../shared/types.js";
 
 export function parsePolicy(text = ""): PolicyRule {
   const cleanText = normalizePolicyText(text);
@@ -10,6 +10,17 @@ export function parsePolicy(text = ""): PolicyRule {
   const contractInteraction = contractInteractionPolicy(cleanText);
   const asset = contractInteraction ? "ANY" : assetFromText(cleanText, tokenSymbol);
   const threshold = thresholdFromText(cleanText, triggerOnAnyTransaction, tokenSymbol);
+  const ast = policyAstFromText({
+    text: cleanText,
+    asset,
+    tokenSymbol,
+    threshold,
+    direction,
+    frequency,
+    triggerOnAnyTransaction,
+    contractInteraction,
+    contractTypes: contractTypesFromText(cleanText),
+  });
   return {
     asset,
     tokenSymbol,
@@ -23,8 +34,120 @@ export function parsePolicy(text = ""): PolicyRule {
     transactionWindowSeconds: frequency?.windowSeconds,
     contractInteraction,
     contractTypes: contractTypesFromText(cleanText),
+    ast,
+    compiledSummary: compiledSummary(ast),
     rawText: cleanText || "Alert me if more than 10 MNT leaves this wallet, especially if the recipient is new.",
   };
+}
+
+function policyAstFromText(input: {
+  text: string;
+  asset: "MNT" | "ERC20" | "ANY";
+  tokenSymbol?: string;
+  threshold: number;
+  direction: "incoming" | "outgoing" | "both";
+  frequency: { count: number; windowSeconds: number } | null;
+  triggerOnAnyTransaction: boolean;
+  contractInteraction: boolean;
+  contractTypes?: string[];
+}): PolicyAst {
+  const conditions: PolicyCondition[] = [];
+  const logic = policyLogicFromText(input.text);
+
+  if (input.frequency) {
+    conditions.push({
+      type: "transaction_count",
+      direction: input.direction,
+      op: ">=",
+      value: input.frequency.count,
+      windowSeconds: input.frequency.windowSeconds,
+    });
+  }
+
+  if (input.triggerOnAnyTransaction) {
+    conditions.push({
+      type: "any_transaction",
+      asset: input.asset,
+      direction: input.direction,
+    });
+  }
+
+  if (amountThresholdMentioned(input.text) || (!conditions.length && !input.contractInteraction)) {
+    conditions.push({
+      type: "transfer_amount",
+      asset: input.asset,
+      tokenSymbol: input.tokenSymbol,
+      direction: input.direction,
+      op: comparisonOpFromText(input.text),
+      value: input.threshold,
+    });
+  }
+
+  if (hardNewCounterpartyCondition(input.text)) {
+    conditions.push({
+      type: "new_counterparty",
+      direction: input.direction,
+    });
+  }
+
+  if (input.contractInteraction) {
+    conditions.push({
+      type: "contract_interaction",
+      contractTypes: input.contractTypes,
+    });
+  }
+
+  return {
+    version: 1,
+    logic,
+    conditions: dedupeConditions(conditions),
+  };
+}
+
+function policyLogicFromText(text: string): PolicyLogic {
+  if (/\b(or|either)\b/i.test(text) && !/\b(and)\b/i.test(text)) return "OR";
+  if (/\b(or|either)\b/i.test(text) && /\b(and)\b/i.test(text)) return "OR";
+  return "AND";
+}
+
+function amountThresholdMentioned(text: string): boolean {
+  return /(?:more than|greater than|over|above|exceeds?|>=|>|at least|minimum of|min\.?)\s*\d+(?:\.\d+)?\s*(?:MNT|mantle|tokens?|USDC|USDT|WETH|WMNT|METH|CMETH|FBTC)\b|\d+(?:\.\d+)?\s*(?:MNT|mantle|USDC|USDT|WETH|WMNT|METH|CMETH|FBTC)\b/i.test(text);
+}
+
+function comparisonOpFromText(text: string): PolicyComparisonOp {
+  if (/(?:at least|minimum of|min\.?|>=|greater than or equal to)/i.test(text)) return ">=";
+  if (/\b(exactly|equal to|=)\b/i.test(text)) return "=";
+  return ">";
+}
+
+function hardNewCounterpartyCondition(text: string): boolean {
+  if (/\bespecially\b/i.test(text)) return false;
+  return /\b(only if|must be|when|and)\b.{0,40}\b(new|first[-\s]?seen|unknown|fresh)\b.{0,40}\b(recipient|counterparty|destination|address|wallet)\b|\b(only if|must be|when|and)\b.{0,40}\b(recipient|counterparty|destination|address|wallet)\b.{0,40}\b(new|first[-\s]?seen|unknown|fresh)\b|\b(to|goes to|sent to|sends to)\b.{0,30}\b(new|first[-\s]?seen|unknown|fresh)\b/i.test(text);
+}
+
+function dedupeConditions(conditions: PolicyCondition[]): PolicyCondition[] {
+  const seen = new Set<string>();
+  return conditions.filter((condition) => {
+    const key = JSON.stringify(condition);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function compiledSummary(ast: PolicyAst): string[] {
+  return ast.conditions.map((condition) => {
+    if (condition.type === "transfer_amount") {
+      const asset = condition.asset === "ERC20" ? condition.tokenSymbol || "ERC-20" : condition.asset;
+      return `${condition.direction} ${asset} amount ${condition.op} ${condition.value}`;
+    }
+    if (condition.type === "transaction_count") {
+      return `${condition.direction} transaction count ${condition.op} ${condition.value} within ${Math.round(condition.windowSeconds / 60)} min`;
+    }
+    if (condition.type === "any_transaction") return `${condition.direction} any ${condition.asset} transaction`;
+    if (condition.type === "new_counterparty") return `${condition.direction} new counterparty required`;
+    return `known contract interaction${condition.contractTypes?.length ? `: ${condition.contractTypes.join(", ")}` : ""}`;
+  });
 }
 
 function thresholdFromText(text: string, triggerOnAnyTransaction: boolean, tokenSymbol?: string): number {

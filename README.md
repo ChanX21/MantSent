@@ -161,6 +161,26 @@ MANTSENT_ENABLE_DEMO_MODE=true
 7. Resolve matching alerts as expected or suspicious in Telegram.
 8. Use the website to inspect alpha score, source coverage, signal taxonomy, incident history, and agent posture.
 
+## Policy Compiler
+
+MantSent compiles natural-language policies into deterministic rules before monitoring starts. The parser supports amount thresholds, incoming/outgoing direction, transaction frequency windows, any-transaction rules, ERC-20 token thresholds, first-seen counterparty escalation, and known bridge/router/contract interactions.
+
+Policies are represented internally as a structured AST with `AND`/`OR` logic where supported. The LLM is not allowed to decide whether an alert fires; it can only explain a policy match after the deterministic engine has evaluated the transaction.
+
+Unsupported categories such as NFT transfers, gas spikes, failed transactions, and arbitrary contract event semantics are rejected instead of silently guessed.
+
+## Shipping Award Readiness
+
+MantSent is structured to satisfy the deployment milestone award once the public deployment is live:
+
+- Smart contract deployed on Mantle Sepolia: `0x727D5784C001808D39C5c4a85Cb27BcE748Ae879`.
+- Contract verification should be completed on Mantle Explorer before submission.
+- AI-assisted incident explanations are written into the on-chain proof flow through `AlertCommitted` and operator-reviewed `OutcomeRecorded` receipts.
+- The frontend must be publicly accessible. Set `MANTSENT_DASHBOARD_BASE_URL` to the deployed HTTPS URL, not localhost.
+- Include the deployment address, public frontend URL, verified explorer link, GitHub repo, and a 2+ minute demo video in DoraHacks.
+
+See `docs/SHIPPING_AWARD_CHECKLIST.md` for the complete checklist.
+
 ## Mantle Data Coverage
 
 The live monitor polls confirmed Mantle blocks and evaluates:
