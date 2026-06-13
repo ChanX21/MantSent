@@ -2,6 +2,10 @@
 
 MantSent is a Mantle-native wallet intelligence agent. Telegram is the primary operator surface for agent setup, wallet policy, monitoring, and human outcome labels. The website is a read-only analytics dashboard for signal quality, Mantle data coverage, incident history, and proof posture.
 
+## Live Deployment: mantsent.up.railway.app
+## Deployed AI Audit Trail Contract: https://sepolia.mantlescan.xyz/address/0x727D5784C001808D39C5c4a85Cb27BcE748Ae879
+## Telegram Bot: https://t.me/mantsentbot
+
 ## Run
 
 ```sh
