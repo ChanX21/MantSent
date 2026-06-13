@@ -2,9 +2,15 @@
 
 MantSent is a Mantle-native wallet intelligence agent. Telegram is the primary operator surface for agent setup, wallet policy, monitoring, and human outcome labels. The website is a read-only analytics dashboard for signal quality, Mantle data coverage, incident history, and proof posture.
 
+<img width="2992" height="1438" alt="image" src="https://github.com/user-attachments/assets/e6d27a06-298d-42a1-b267-128e4acd1b07" />
+
+
 ## Live Deployment: [mantsent.up.railway.app](https://mantsent.up.railway.app)
 ## Deployed AI Audit Trail Contract: https://sepolia.mantlescan.xyz/address/0x727D5784C001808D39C5c4a85Cb27BcE748Ae879
 ## Telegram Bot: https://t.me/mantsentbot
+
+<img width="1080" height="1350" alt="hgh" src="https://github.com/user-attachments/assets/f4a6808f-39ea-4eee-9581-905aaa9f5443" />
+
 
 ## Run
 
@@ -14,6 +20,11 @@ npm run dev
 ```
 
 The browser bundle is generated from TypeScript with `npm run build:client`. `npm run dev` builds the client once and starts the TypeScript server.
+
+## Architecture
+
+<img width="1470" height="922" alt="image" src="https://github.com/user-attachments/assets/c97b6bb4-519b-4929-b2ea-442df3bd79d4" />
+
 
 ## Environment
 
@@ -149,18 +160,6 @@ MANTSENT_ENABLE_DEMO_MODE=true
 6. Enable live Mantle monitoring.
 7. Resolve matching alerts as expected or suspicious in Telegram.
 8. Use the website to inspect alpha score, source coverage, signal taxonomy, incident history, and agent posture.
-
-## Shipping Award Readiness
-
-MantSent is structured to satisfy the deployment milestone award once the public deployment is live:
-
-- Smart contract deployed on Mantle Sepolia: `0x727D5784C001808D39C5c4a85Cb27BcE748Ae879`.
-- Contract verification should be completed on Mantle Explorer before submission.
-- AI-assisted incident explanations are written into the on-chain proof flow through `AlertCommitted` and operator-reviewed `OutcomeRecorded` receipts.
-- The frontend must be publicly accessible. Set `MANTSENT_DASHBOARD_BASE_URL` to the deployed HTTPS URL, not localhost.
-- Include the deployment address, public frontend URL, verified explorer link, GitHub repo, and a 2+ minute demo video in DoraHacks.
-
-See `docs/SHIPPING_AWARD_CHECKLIST.md` for the complete checklist.
 
 ## Mantle Data Coverage
 
