@@ -793,7 +793,7 @@ function render() {
 // src/client/api.ts
 async function loadRemoteState() {
   try {
-    const response = await fetch("api/state");
+    const response = await fetch(stateUrl());
     if (!response.ok) throw new Error("backend unavailable");
     applyRemoteState(await response.json());
     state.online = true;
@@ -801,6 +801,17 @@ async function loadRemoteState() {
     state.online = false;
   }
   render();
+}
+function stateUrl() {
+  const current = new URL(window.location.href);
+  const state2 = new URL("api/state", current.origin);
+  const scope = current.searchParams.get("scope");
+  const token = current.searchParams.get("token");
+  if (scope && token) {
+    state2.searchParams.set("scope", scope);
+    state2.searchParams.set("token", token);
+  }
+  return state2.toString();
 }
 
 // src/client/main.ts
