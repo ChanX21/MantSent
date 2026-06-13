@@ -6,7 +6,7 @@ import { formatMnt, normalizeAddress, provider } from "../chain/mantle.js";
 import { commitAlertProof } from "../chain/proofs.js";
 import { lookupKnownContract } from "../entities/known-contracts.js";
 import { parsePolicy } from "../policy/policy-parser.js";
-import { loadState, mutateState } from "../state/store.js";
+import { activeMonitorScopes, loadState, mutateState } from "../state/store.js";
 
 const pollIntervalMs = 15_000;
 const confirmations = 2;
@@ -14,11 +14,15 @@ const maxBlocksPerTick = 12;
 const transferTopic = ethers.id("Transfer(address,address,uint256)");
 const erc20Abi = ["function symbol() view returns (string)", "function decimals() view returns (uint8)"] as const;
 
-export function startMantleMonitor(env: RuntimeEnv, onIncident?: (incident: Incident) => Promise<void> | void): void {
+export function startMantleMonitor(env: RuntimeEnv, onIncident?: (incident: Incident, scopeId: string) => Promise<void> | void): void {
   const rpc = provider(env);
 
   async function tick(): Promise<void> {
-    const state = loadState();
+    await Promise.all(activeMonitorScopes().map((scopeId) => tickScope(scopeId).catch((error) => recordMonitorError(error, scopeId))));
+  }
+
+  async function tickScope(scopeId: string): Promise<void> {
+    const state = loadState(scopeId);
     if (!state.monitorActive || !state.walletWatched || !state.policyActive || !state.watchedWallets.length) return;
 
     const latest = await rpc.getBlockNumber();
@@ -28,8 +32,8 @@ export function startMantleMonitor(env: RuntimeEnv, onIncident?: (incident: Inci
     if (toBlock < fromBlock) return;
 
     for (let blockNumber = fromBlock; blockNumber <= toBlock; blockNumber += 1) {
-      await scanBlock(env, blockNumber, onIncident);
-      await scanErc20Transfers(env, blockNumber, onIncident);
+      await scanBlock(env, blockNumber, scopeId, onIncident);
+      await scanErc20Transfers(env, blockNumber, scopeId, onIncident);
     }
 
     mutateState((current) => {
@@ -37,7 +41,7 @@ export function startMantleMonitor(env: RuntimeEnv, onIncident?: (incident: Inci
       current.monitorLastBlock = Math.max(current.monitorLastBlock || 0, toBlock);
       current.monitorLastCheckedAt = new Date().toISOString();
       current.monitorLastError = "";
-    });
+    }, scopeId);
   }
 
   setInterval(() => {
@@ -47,27 +51,27 @@ export function startMantleMonitor(env: RuntimeEnv, onIncident?: (incident: Inci
   tick().catch((error) => recordMonitorError(error));
 }
 
-function recordMonitorError(error: unknown): void {
+function recordMonitorError(error: unknown, scopeId = "default"): void {
   const message = (error as Error).message || "Unknown monitor error";
   console.error(`Mantle monitor error: ${message}`);
   mutateState((current) => {
     current.monitorLastCheckedAt = new Date().toISOString();
     current.monitorLastError = message;
-  });
+  }, scopeId);
 }
 
-async function scanBlock(env: RuntimeEnv, blockNumber: number, onIncident?: (incident: Incident) => Promise<void> | void): Promise<void> {
+async function scanBlock(env: RuntimeEnv, blockNumber: number, scopeId: string, onIncident?: (incident: Incident, scopeId: string) => Promise<void> | void): Promise<void> {
   const rpc = provider(env);
   const block = await rpc.getBlock(blockNumber, true);
   if (!block) return;
 
   for (const tx of block.prefetchedTransactions) {
-    await maybeProcessTransaction(env, tx, onIncident);
+    await maybeProcessTransaction(env, tx, scopeId, onIncident);
   }
 }
 
-async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse, onIncident?: (incident: Incident) => Promise<void> | void): Promise<void> {
-  const state = loadState();
+async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse, scopeId: string, onIncident?: (incident: Incident, scopeId: string) => Promise<void> | void): Promise<void> {
+  const state = loadState(scopeId);
   if (!state.monitorActive || !state.walletWatched || !state.policyActive || !state.watchedWallets.length) return;
   if (!tx.to) return;
   const match = nativeWalletMatch(state.watchedWallets, tx);
@@ -101,7 +105,7 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
     if (!current.seenRecipients.map((address) => address.toLowerCase()).includes(recipient.toLowerCase())) {
       current.seenRecipients.push(recipient);
     }
-  });
+  }, scopeId);
 
   if (!decision.shouldAlert) return;
   const frequencyWindow = policy.transactionWindowSeconds || 300;
@@ -112,7 +116,7 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
     current.evidenceSource = "mantle-transaction";
     current.recipient = recipient;
     current.watchedWallet = match.wallet.address;
-  });
+  }, scopeId);
 
   const proof = await commitAlertProof(env, prepared, {
     evidenceTxHash: tx.hash,
@@ -151,12 +155,12 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
     current.lastAlertHash = proof.alertHash || "";
     if (decision.reasonCodes.includes("TRANSACTION_FREQUENCY")) current.lastFrequencyAlertAt = timestamp;
     current.incidents.unshift(incident);
-  });
-  await onIncident?.(incident);
+  }, scopeId);
+  await onIncident?.(incident, scopeId);
 }
 
-async function scanErc20Transfers(env: RuntimeEnv, blockNumber: number, onIncident?: (incident: Incident) => Promise<void> | void): Promise<void> {
-  const state = loadState();
+async function scanErc20Transfers(env: RuntimeEnv, blockNumber: number, scopeId: string, onIncident?: (incident: Incident, scopeId: string) => Promise<void> | void): Promise<void> {
+  const state = loadState(scopeId);
   if (!state.monitorActive || !state.walletWatched || !state.policyActive || !state.watchedWallets.length) return;
   const policy = state.policy ?? parsePolicy();
   if (policy.asset === "MNT" && !policy.transactionCountThreshold) return;
@@ -174,13 +178,13 @@ async function scanErc20Transfers(env: RuntimeEnv, blockNumber: number, onIncide
     const toTopic = log.topics[2]?.toLowerCase();
     const outgoingWallet = fromTopic ? watchedTopics.get(fromTopic) : undefined;
     const incomingWallet = toTopic ? watchedTopics.get(toTopic) : undefined;
-    if (outgoingWallet) await maybeProcessTokenTransfer(env, log, "outgoing", outgoingWallet, onIncident);
-    if (incomingWallet && incomingWallet.address.toLowerCase() !== outgoingWallet?.address.toLowerCase()) await maybeProcessTokenTransfer(env, log, "incoming", incomingWallet, onIncident);
+    if (outgoingWallet) await maybeProcessTokenTransfer(env, log, "outgoing", outgoingWallet, scopeId, onIncident);
+    if (incomingWallet && incomingWallet.address.toLowerCase() !== outgoingWallet?.address.toLowerCase()) await maybeProcessTokenTransfer(env, log, "incoming", incomingWallet, scopeId, onIncident);
   }
 }
 
-async function maybeProcessTokenTransfer(env: RuntimeEnv, log: Log, direction: "incoming" | "outgoing", watchedWalletProfile: WatchedWalletProfile, onIncident?: (incident: Incident) => Promise<void> | void): Promise<void> {
-  const state = loadState();
+async function maybeProcessTokenTransfer(env: RuntimeEnv, log: Log, direction: "incoming" | "outgoing", watchedWalletProfile: WatchedWalletProfile, scopeId: string, onIncident?: (incident: Incident, scopeId: string) => Promise<void> | void): Promise<void> {
+  const state = loadState(scopeId);
   if (!state.monitorActive || !state.walletWatched || !state.policyActive || !state.watchedWallets.length) return;
   const evidenceKey = `${watchedWalletProfile.address}:${log.transactionHash}:${log.index}`;
   if (state.incidents.some((incident) => (incident.evidenceKey || incident.evidenceTxHash).toLowerCase() === evidenceKey.toLowerCase())) return;
@@ -214,7 +218,7 @@ async function maybeProcessTokenTransfer(env: RuntimeEnv, log: Log, direction: "
     if (!current.seenRecipients.map((address) => address.toLowerCase()).includes(recipient.toLowerCase())) {
       current.seenRecipients.push(recipient);
     }
-  });
+  }, scopeId);
 
   if (!decision.shouldAlert) return;
   const prepared = mutateState((current) => {
@@ -222,7 +226,7 @@ async function maybeProcessTokenTransfer(env: RuntimeEnv, log: Log, direction: "
     current.evidenceSource = "mantle-transaction";
     current.recipient = recipient;
     current.watchedWallet = watchedWalletProfile.address;
-  });
+  }, scopeId);
   const proof = await commitAlertProof(env, prepared, {
     evidenceTxHash: log.transactionHash,
     amountMnt: String(amount),
@@ -262,8 +266,8 @@ async function maybeProcessTokenTransfer(env: RuntimeEnv, log: Log, direction: "
     current.alertTxHash = proof.txHash;
     current.lastAlertHash = proof.alertHash || "";
     current.incidents.unshift(incident);
-  });
-  await onIncident?.(incident);
+  }, scopeId);
+  await onIncident?.(incident, scopeId);
 }
 
 export function nativeWalletMatch(

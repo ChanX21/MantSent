@@ -4,7 +4,7 @@ import { createActionService } from "./actions/action-service.js";
 import { loadEnv, updateEnvValue } from "./config/env.js";
 import { createRequestHandler } from "./http/request-handler.js";
 import { startMantleMonitor } from "./monitor/mantle-monitor.js";
-import { loadState } from "./state/store.js";
+import { chatIdsForScope } from "./state/store.js";
 import { createTelegramService } from "./telegram/telegram-service.js";
 import { defaultTelegramImagePath } from "../shared/branding.js";
 
@@ -40,9 +40,9 @@ createServer(handler).listen(port, "0.0.0.0", () => {
 });
 
 telegram.poll();
-startMantleMonitor(env, async () => {
+startMantleMonitor(env, async (_incident, scopeId) => {
   const chatIds = notificationChatIds(env.TELEGRAM_ADMIN_CHAT_IDS);
-  if (!chatIds.length) chatIds.push(...loadState().chatIds);
+  if (!chatIds.length) chatIds.push(...chatIdsForScope(scopeId));
   await Promise.all(
     [...new Set(chatIds)].map((chatId) =>
       telegram.sendStatus(chatId).catch((error) => console.error(`Telegram alert send error: ${(error as Error).message}`)),
