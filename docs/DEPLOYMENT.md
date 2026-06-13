@@ -15,6 +15,8 @@ Use:
 ```env
 MANTSENT_STATE_BACKEND=sqlite
 MANTSENT_SQLITE_PATH=data/mantsent.sqlite
+MANTSENT_DASHBOARD_SECRET=long-random-dashboard-secret
+PASSPORT_BASE_URL=https://your-railway-domain.up.railway.app
 ```
 
 Run command:
@@ -35,6 +37,14 @@ Health check:
 ```text
 /api/health
 ```
+
+Scoped frontend access:
+
+```text
+/dashboard
+```
+
+Open the signed URL returned by Telegram. The bare root URL still loads the default public dashboard state; the signed URL loads the operator's scoped wallet, policy, incidents, monitor health, and proof timeline.
 
 ## Vercel Caveat
 

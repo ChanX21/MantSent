@@ -32,8 +32,17 @@ if (Number(env.MANTLE_CHAIN_ID) !== 5003 && Number(env.MANTLE_CHAIN_ID) !== 5000
 validateJsonArray("MANTSENT_ENTITY_LABELS", ["address", "label", "category", "importance"]);
 validateJsonArray("MANTSENT_KNOWN_CONTRACTS", ["address", "label", "type"]);
 validateStateBackend();
+validateDashboardSecret();
 
 console.log("MantSent environment is deployment-ready.");
+
+function validateDashboardSecret(): void {
+  const secret = env.MANTSENT_DASHBOARD_SECRET || env.MANTSENT_API_ADMIN_TOKEN || env.TELEGRAM_WEBHOOK_SECRET;
+  if (!secret || secret.length < 24) {
+    console.error("Set MANTSENT_DASHBOARD_SECRET to a random value with at least 24 characters.");
+    process.exit(1);
+  }
+}
 
 function validateStateBackend(): void {
   const backend = String(env.MANTSENT_STATE_BACKEND || "json").toLowerCase();

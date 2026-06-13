@@ -24,6 +24,13 @@ Secrets are intentionally excluded from git. `DEPLOYER_PRIVATE_KEY` must stay lo
 
 HTTP mutations are locked behind `MANTSENT_API_ADMIN_TOKEN`. If the value is missing, the app generates one on boot and saves it to `.env`. Static serving is allowlisted to the browser bundle and `assets/`; `.env`, `data/`, source files, and deployment artifacts are not served.
 
+Scoped dashboard links are signed with `MANTSENT_DASHBOARD_SECRET`. If it is not set, MantSent falls back to `MANTSENT_API_ADMIN_TOKEN` or `TELEGRAM_WEBHOOK_SECRET`. For deployed apps, set it explicitly:
+
+```env
+MANTSENT_DASHBOARD_SECRET=long-random-dashboard-secret
+PASSPORT_BASE_URL=https://your-railway-domain.up.railway.app
+```
+
 Telegram mutations are restricted to `TELEGRAM_ADMIN_CHAT_IDS`. To find your chat ID, send `/start` to the bot before setting the value; the unauthorized response includes the chat ID to add:
 
 ```env
@@ -113,10 +120,11 @@ Then message the bot configured by `TELEGRAM_BOT_TOKEN`:
 /brief
 /session
 /health
+/dashboard
 /proof
 ```
 
-Inline buttons are intentionally limited to high-signal actions such as enabling monitoring and marking unresolved alerts as expected or suspicious. `/brief` returns an investor/operator risk snapshot. `/simulate` is intentionally demo-only; live alerts come from the Mantle monitor after `/watch`, `/policy`, and `/monitor`.
+Inline buttons are intentionally limited to high-signal actions such as enabling monitoring and marking unresolved alerts as expected or suspicious. `/brief` returns an investor/operator risk snapshot. `/dashboard` returns a signed analytics link scoped to the current Telegram session. `/simulate` is intentionally demo-only; live alerts come from the Mantle monitor after `/watch`, `/policy`, and `/monitor`.
 
 Demo shortcuts are disabled by default. To expose `/demo` and demo wallet buttons in a non-production environment, set:
 
