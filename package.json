@@ -10,6 +10,7 @@
     "preview": "vite --host 0.0.0.0",
     "build:client": "node scripts/build-client.mjs",
     "deploy:ledger": "npm run build && node dist/scripts/deploy-ledger.js",
+    "state:import:sqlite": "npm run build && node dist/scripts/import-json-state-to-sqlite.js",
     "env:check": "npm run build && node dist/scripts/check-env.js",
     "typecheck": "tsc --noEmit",
     "build": "npm run build:client && tsc",
