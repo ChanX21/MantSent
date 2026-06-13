@@ -183,6 +183,7 @@ For the Mirana Alpha & Data track, MantSent is positioned as wallet-risk and alp
 See `docs/JUDGING.md` for the scorecard mapping and demo script.
 
 See `docs/DEPLOYMENT.md` for non-AWS hackathon deployment notes.
+See `docs/OPERATIONS.md` for reset, backup, migration, and health-check steps.
 
 ## Guardrails
 
