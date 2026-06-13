@@ -54,7 +54,7 @@ export function createRequestHandler({ env, actions, telegram }: { env: RuntimeE
   };
 }
 
-function authorizedDashboardScope(url: URL, env: RuntimeEnv): string | false {
+export function authorizedDashboardScope(url: URL, env: RuntimeEnv): string | false {
   const scopeId = url.searchParams.get("scope") || "";
   const token = url.searchParams.get("token") || "";
   if (!scopeId && !token) return "";
