@@ -596,8 +596,7 @@ function dashboardText(url: string): string {
     return `<b>MantSent Analytics</b>
 Local dashboard link:
 <code>${escapeHtml(url)}</code>
-
-Telegram cannot open localhost links as inline buttons. Copy this link into a browser on the same machine running MantSent, or set <code>MANTSENT_DASHBOARD_BASE_URL</code> to an HTTPS tunnel URL.`;
+`;
   }
   return `<b>MantSent Analytics</b>
 <a href="${escapeHtmlAttribute(url)}">Open your scoped dashboard</a>
