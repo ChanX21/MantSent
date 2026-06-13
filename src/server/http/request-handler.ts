@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { extname, join, normalize, relative } from "node:path";
 import type { ActionPayload, RuntimeEnv } from "../../shared/types.js";
 import type { ActionService } from "../actions/action-service.js";
+import { verifyDashboardToken } from "../auth/dashboard-token.js";
 import { activeMonitorScopes } from "../state/store.js";
 import type { TelegramService } from "../telegram/telegram-service.js";
 import type { TelegramUpdate } from "../telegram/telegram-service.js";
@@ -27,7 +28,11 @@ export function createRequestHandler({ env, actions, telegram }: { env: RuntimeE
     const url = new URL(req.url || "/", `http://${req.headers.host}`);
 
     try {
-      if (url.pathname === "/api/state") return json(res, 200, actions.state());
+      if (url.pathname === "/api/state") {
+        const scopeId = authorizedDashboardScope(url, env);
+        if (scopeId === false) return json(res, 401, { error: "Unauthorized dashboard scope" });
+        return json(res, 200, actions.state(scopeId || undefined));
+      }
       if (url.pathname === "/api/health") return json(res, 200, healthPayload(env));
       if (url.pathname === "/agent-metadata.json") return json(res, 200, agentMetadata(actions));
       if (url.pathname === "/api/action" && req.method === "POST") {
@@ -47,6 +52,14 @@ export function createRequestHandler({ env, actions, telegram }: { env: RuntimeE
 
     serveStatic(url, res);
   };
+}
+
+function authorizedDashboardScope(url: URL, env: RuntimeEnv): string | false {
+  const scopeId = url.searchParams.get("scope") || "";
+  const token = url.searchParams.get("token") || "";
+  if (!scopeId && !token) return "";
+  if (!scopeId || !token) return false;
+  return verifyDashboardToken(env, scopeId, token) ? scopeId : false;
 }
 
 export function healthPayload(env: RuntimeEnv): unknown {
