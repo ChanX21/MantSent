@@ -1,9 +1,12 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { DatabaseSync } from "node:sqlite";
 import type { AppState, PublicState } from "../../shared/types.js";
 import { createAgentProfile } from "../agent/single-wallet-monitoring-agent.js";
 
 const statePath = "data/mantsent-state.json";
+const defaultScopeId = "default";
 const legacyDemoWallet = "0x7F2C2fbb1d2E4b6e6F8E45b902399D8A3C02a91E";
+let sqlite: DatabaseSync | null = null;
 
 const defaultState: AppState = {
   agentCreated: false,
@@ -43,9 +46,26 @@ const defaultState: AppState = {
   incidents: [],
 };
 
-export function loadState(path = statePath): AppState {
+export function loadState(scopeId = defaultScopeId): AppState {
+  const loaded = loadRawState(scopeId);
+  return hydrateState(loaded);
+}
+
+function loadRawState(scopeId: string): AppState {
+  if (sqliteEnabled()) {
+    const row = database()
+      .prepare("SELECT state_json FROM app_states WHERE scope_id = ?")
+      .get(normalizeScopeId(scopeId)) as { state_json?: string } | undefined;
+    if (!row?.state_json) return { ...defaultState };
+    return { ...defaultState, ...JSON.parse(row.state_json) } as AppState;
+  }
+
+  const path = jsonStatePath(scopeId);
   if (!existsSync(path)) return { ...defaultState };
-  const loaded = { ...defaultState, ...JSON.parse(readFileSync(path, "utf8")) } as AppState;
+  return { ...defaultState, ...JSON.parse(readFileSync(path, "utf8")) } as AppState;
+}
+
+function hydrateState(loaded: AppState): AppState {
   loaded.agentUri ||= "agent-metadata.json";
   loaded.agentRegistrationTxHash ||= "";
   loaded.aiProvider ||= "template";
@@ -122,19 +142,109 @@ function legacyWatchedWallets(state: AppState): AppState["watchedWallets"] {
   ];
 }
 
-export function saveState(state: AppState, path = statePath): void {
+export function saveState(state: AppState, scopeId = defaultScopeId): void {
+  if (sqliteEnabled()) {
+    database()
+      .prepare(
+        `INSERT INTO app_states (scope_id, state_json, updated_at)
+         VALUES (?, ?, datetime('now'))
+         ON CONFLICT(scope_id) DO UPDATE SET state_json = excluded.state_json, updated_at = excluded.updated_at`,
+      )
+      .run(normalizeScopeId(scopeId), JSON.stringify(state));
+    return;
+  }
+
+  const path = jsonStatePath(scopeId);
   mkdirSync("data", { recursive: true });
   writeFileSync(path, `${JSON.stringify(state, null, 2)}\n`);
 }
 
-export function mutateState(mutator: (state: AppState) => AppState | void): AppState {
-  const state = loadState();
+export function mutateState(mutator: (state: AppState) => AppState | void, scopeId = defaultScopeId): AppState {
+  const state = loadState(scopeId);
   const next = mutator(state) ?? state;
-  saveState(next);
+  saveState(next, scopeId);
   return next;
 }
 
-export function publicState(): PublicState {
-  const { chatIds: _chatIds, lastAlertHash: _lastAlertHash, ...state } = loadState();
+export function publicState(scopeId = defaultScopeId): PublicState {
+  const { chatIds: _chatIds, lastAlertHash: _lastAlertHash, ...state } = loadState(scopeId);
   return state;
+}
+
+export function scopeIdForTelegramChat(chatId: number): string {
+  const scopeId = `telegram:${chatId}`;
+  if (sqliteEnabled()) {
+    database()
+      .prepare(
+        `INSERT INTO telegram_accounts (chat_id, scope_id, created_at)
+         VALUES (?, ?, datetime('now'))
+         ON CONFLICT(chat_id) DO UPDATE SET scope_id = excluded.scope_id`,
+      )
+      .run(chatId, scopeId);
+  }
+  return scopeId;
+}
+
+export function activeMonitorScopes(): string[] {
+  if (sqliteEnabled()) {
+    return database()
+      .prepare("SELECT scope_id FROM app_states WHERE json_extract(state_json, '$.monitorActive') = 1")
+      .all()
+      .map((row) => String(row.scope_id));
+  }
+
+  const scopes = [defaultScopeId];
+  const dataDir = "data";
+  if (!existsSync(dataDir)) return scopes;
+  for (const file of readdirSync(dataDir)) {
+    if (!file.startsWith("mantsent-state-") || !file.endsWith(".json")) continue;
+    const scope = decodeURIComponent(file.slice("mantsent-state-".length, -".json".length));
+    if (scope && !scopes.includes(scope)) scopes.push(scope);
+  }
+  return scopes.filter((scopeId) => loadState(scopeId).monitorActive);
+}
+
+export function chatIdsForScope(scopeId: string): number[] {
+  if (scopeId.startsWith("telegram:")) {
+    const chatId = Number(scopeId.slice("telegram:".length));
+    return Number.isFinite(chatId) ? [chatId] : [];
+  }
+  return loadState(scopeId).chatIds;
+}
+
+function sqliteEnabled(): boolean {
+  return String(process.env.MANTSENT_STATE_BACKEND || "").toLowerCase() === "sqlite";
+}
+
+function database(): DatabaseSync {
+  if (sqlite) return sqlite;
+  mkdirSync("data", { recursive: true });
+  sqlite = new DatabaseSync(process.env.MANTSENT_SQLITE_PATH || "data/mantsent.sqlite");
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS app_states (
+      scope_id TEXT PRIMARY KEY,
+      state_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS telegram_accounts (
+      chat_id INTEGER PRIMARY KEY,
+      scope_id TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_app_states_updated_at ON app_states(updated_at);
+  `);
+  return sqlite;
+}
+
+function jsonStatePath(scopeId: string): string {
+  if (normalizeScopeId(scopeId) === defaultScopeId) return statePath;
+  return `data/mantsent-state-${safeScopeFileName(scopeId)}.json`;
+}
+
+function normalizeScopeId(scopeId: string): string {
+  return scopeId.trim() || defaultScopeId;
+}
+
+function safeScopeFileName(scopeId: string): string {
+  return encodeURIComponent(normalizeScopeId(scopeId));
 }
