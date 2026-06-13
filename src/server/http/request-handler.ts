@@ -49,7 +49,7 @@ export function createRequestHandler({ env, actions, telegram }: { env: RuntimeE
   };
 }
 
-function healthPayload(env: RuntimeEnv): unknown {
+export function healthPayload(env: RuntimeEnv): unknown {
   return {
     ok: true,
     service: "mantsent",
