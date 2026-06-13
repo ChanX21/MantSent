@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import type { ActionName, ActionPayload, PublicState } from "../../shared/types.js";
 import type { ActionService } from "../actions/action-service.js";
+import { dashboardUrl } from "../auth/dashboard-token.js";
 import { mutateState, scopeIdForTelegramChat } from "../state/store.js";
 import { mantleTxUrl } from "../../shared/explorer.js";
 import { defaultMantleLogoUrl, defaultTelegramImagePath, mantleProofTagline, telegramIntroCaption } from "../../shared/branding.js";
@@ -62,6 +63,7 @@ export function createTelegramService({
   telegramImagePath = defaultTelegramImagePath,
   demoMode = false,
   adminChatIds,
+  dashboardBaseUrl,
 }: {
   botToken?: string;
   actions: ActionService;
@@ -70,7 +72,9 @@ export function createTelegramService({
   telegramImagePath?: string;
   demoMode?: boolean;
   adminChatIds?: string;
+  dashboardBaseUrl?: string;
 }): TelegramService {
+  const dashboardEnv = dashboardBaseUrl ? { PASSPORT_BASE_URL: dashboardBaseUrl } : {};
   const adminChats = parseAdminChatIds(adminChatIds);
   async function call<T>(method: string, body: Record<string, unknown>): Promise<T> {
     if (!botToken) throw new Error("TELEGRAM_BOT_TOKEN is not set.");
@@ -296,6 +300,13 @@ export function createTelegramService({
           text: healthText(actions.state(scopeId)),
           parse_mode: "HTML",
         });
+      } else if (command === "/dashboard") {
+        await call("sendMessage", {
+          chat_id: chatId,
+          text: dashboardText({ ...dashboardEnv }, scopeId),
+          parse_mode: "HTML",
+          disable_web_page_preview: true,
+        });
       } else if (command === "/label") {
         if (!args) {
           await call("sendMessage", {
@@ -371,7 +382,7 @@ export function createTelegramService({
         await call("sendMessage", {
           chat_id: chatId,
           text:
-            `<b>Commands</b>\n/deploy [agent name]\n/register [agentURI]\n/groq gsk-... [model]\n/openai sk-... [model]\n/watch 0x...\n/watch_add 0x... | Label | treasury | high\n/watch_remove 0x...\n/watchlist\n/label Treasury Ops | treasury | high\n/policies\n/policy alert me if more than 10 MNT leaves\n/monitor\n/expected\n/suspicious\n/brief\n/session\n/health\n/proof\n/reset\n/redeploy${demoMode ? "\n/demo" : ""}`,
+            `<b>Commands</b>\n/deploy [agent name]\n/register [agentURI]\n/groq gsk-... [model]\n/openai sk-... [model]\n/watch 0x...\n/watch_add 0x... | Label | treasury | high\n/watch_remove 0x...\n/watchlist\n/label Treasury Ops | treasury | high\n/policies\n/policy alert me if more than 10 MNT leaves\n/monitor\n/expected\n/suspicious\n/brief\n/session\n/health\n/dashboard\n/proof\n/reset\n/redeploy${demoMode ? "\n/demo" : ""}`,
           parse_mode: "HTML",
         });
       }
@@ -477,7 +488,7 @@ function isAuthorizedChat(chatId: number, adminChats: Set<number>): boolean {
 }
 
 function isReadOnlyCommand(command?: string): boolean {
-  return !command || ["/start", "/proof", "/incidents", "/watchlist", "/policies", "/brief", "/session", "/health", "/help"].includes(command);
+  return !command || ["/start", "/proof", "/incidents", "/watchlist", "/policies", "/brief", "/session", "/health", "/dashboard", "/help"].includes(command);
 }
 
 function isReadOnlyCallback(action: string): boolean {
@@ -501,6 +512,7 @@ function commandsFor(demoMode: boolean): TelegramCommand[] {
     { command: "brief", description: "Show current risk brief" },
     { command: "session", description: "Show operator session and storage status" },
     { command: "health", description: "Show monitor and proof readiness" },
+    { command: "dashboard", description: "Open your scoped analytics dashboard" },
     { command: "openai", description: "Add an OpenAI key for richer explanations" },
     { command: "groq", description: "Add a Groq key for richer explanations" },
     { command: "proof", description: "Show agent, policy, alert, and outcome proofs" },
@@ -569,6 +581,15 @@ Policy: ${state.policyActive ? "Active" : "Not set"}
 Monitor: ${state.monitorActive ? "Live" : "Off"}
 Last check: ${state.monitorLastCheckedAt || "Not checked"}
 Last error: ${state.monitorLastError ? escapeHtml(state.monitorLastError) : "None"}`;
+}
+
+function dashboardText(env: Record<string, string | undefined>, scopeId: string): string {
+  const url = dashboardUrl({ ...process.env, ...env }, scopeId);
+  return `<b>MantSent Analytics</b>
+Open your scoped dashboard:
+${escapeHtml(url)}
+
+This link is scoped to your Telegram session. Do not post it publicly.`;
 }
 
 function parseWalletProfileArgs(args: string): { name: string; category: "treasury" | "whale" | "protocol" | "exchange" | "fresh" | "custom"; importance: "low" | "medium" | "high" } {
