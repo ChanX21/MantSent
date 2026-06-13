@@ -39,7 +39,7 @@ MANTSENT_STATE_BACKEND=sqlite
 MANTSENT_SQLITE_PATH=data/mantsent.sqlite
 ```
 
-Each Telegram chat maps to a scope like `telegram:518819057`, so one operator can deploy an agent, set wallets, commit a policy, and enable monitoring without overwriting another operator's session. The live monitor scans every active scope independently and routes alerts back to the owning Telegram chat, or to `TELEGRAM_ADMIN_CHAT_IDS` when admin IDs are configured. In Telegram, `/session` shows the current scope, backend, wallet count, policy state, monitor state, and last scanned block.
+Each Telegram chat maps to a scope like `telegram:518819057`, so one operator can deploy an agent, set wallets, commit a policy, and enable monitoring without overwriting another operator's session. The live monitor scans every active scope independently and routes alerts back to the owning Telegram chat, or to `TELEGRAM_ADMIN_CHAT_IDS` when admin IDs are configured. In Telegram, `/session` shows the current scope, backend, wallet count, policy state, monitor state, and last scanned block. `/health` summarizes agent, AI, policy, monitor, and error readiness.
 
 For hosted deployments, keep the SQLite file on a persistent volume. If the provider has no persistent disk, use JSON/SQLite only for demos and migrate the same scoped state model to managed Postgres after the hackathon.
 
@@ -112,6 +112,7 @@ Then message the bot configured by `TELEGRAM_BOT_TOKEN`:
 /monitor
 /brief
 /session
+/health
 /proof
 ```
 
