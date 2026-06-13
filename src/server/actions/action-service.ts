@@ -17,7 +17,7 @@ import { mutateState, publicState } from "../state/store.js";
 const demoRecipient = "0x48B981747384A90A24ad834DAd6AfaB6D1f0F0C2";
 
 export interface ActionService {
-  state: () => PublicState;
+  state: (scopeId?: string) => PublicState;
   run: (action: ActionName, payload?: ActionPayload) => Promise<PublicState> | PublicState;
 }
 
@@ -35,9 +35,9 @@ export function createActionService(env: RuntimeEnv): ActionService {
       if (action === "watchlist") return updateWatchlistProfile(payload);
       if (action === "policy") return activatePolicy(env, payload);
       if (action === "transfer") return simulateTransfer(env, payload);
-      if (action === "expected" || action === "suspicious") return resolveAlert(env, action);
-      if (action === "monitor") return enableMonitor();
-      if (action === "reset") return resetDemo(env);
+      if (action === "expected" || action === "suspicious") return resolveAlert(env, action, payload);
+      if (action === "monitor") return enableMonitor(payload);
+      if (action === "reset") return resetDemo(env, payload);
       throw new Error(`Unknown action: ${action}`);
     },
   };
@@ -55,7 +55,7 @@ function createAgent(env: RuntimeEnv, payload: ActionPayload = {}): AppState {
     state.agentProfile = createAgentProfile(env, state.agentId);
     state.aiProvider = configuredProvider(env);
     state.openAiConfigured = isHostedAiConfigured(env, state.aiProvider);
-  });
+  }, scopeFromPayload(payload));
 }
 
 async function registerAgent(env: RuntimeEnv, payload: ActionPayload): Promise<PublicState> {
@@ -70,7 +70,7 @@ async function registerAgent(env: RuntimeEnv, payload: ActionPayload): Promise<P
     state.agentIdentityStatus = "erc8004-registered";
     state.agentProfile = createAgentProfile(env, result.agentId);
     state.agentProfile.identityStatus = "erc8004-registered";
-  });
+  }, scopeFromPayload(payload));
 }
 
 async function deployAgent(env: RuntimeEnv, payload: ActionPayload): Promise<PublicState> {
@@ -106,7 +106,7 @@ function configureAi(env: RuntimeEnv, payload: ActionPayload): AppState {
   return mutateState((state) => {
     state.aiProvider = provider;
     state.openAiConfigured = isHostedAiConfigured(env, provider);
-  });
+  }, scopeFromPayload(payload));
 }
 
 function walletProfileFromPayload(env: RuntimeEnv, payload: ActionPayload, fallbackLabel = "Primary Mantle Wallet"): WatchedWalletProfile {
@@ -151,7 +151,7 @@ function watchWallet(env: RuntimeEnv, payload: ActionPayload): AppState {
     state.recentTransactions = [];
     state.lastFrequencyAlertAt = 0;
     state.incidents = [];
-  });
+  }, scopeFromPayload(payload));
 }
 
 function addWatchedWallet(env: RuntimeEnv, payload: ActionPayload): AppState {
@@ -163,7 +163,7 @@ function addWatchedWallet(env: RuntimeEnv, payload: ActionPayload): AppState {
     const existingIndex = state.watchedWallets.findIndex((wallet) => wallet.address.toLowerCase() === profile.address.toLowerCase());
     if (existingIndex >= 0) state.watchedWallets[existingIndex] = { ...state.watchedWallets[existingIndex], ...profile, createdAt: state.watchedWallets[existingIndex]?.createdAt || profile.createdAt };
     else state.watchedWallets.push(profile);
-  });
+  }, scopeFromPayload(payload));
 }
 
 function removeWatchedWallet(payload: ActionPayload): AppState {
@@ -177,7 +177,7 @@ function removeWatchedWallet(payload: ActionPayload): AppState {
       state.policyActive = false;
       state.policy = null;
     }
-  });
+  }, scopeFromPayload(payload));
 }
 
 function updateWatchlistProfile(payload: ActionPayload): AppState {
@@ -193,11 +193,12 @@ function updateWatchlistProfile(payload: ActionPayload): AppState {
       createdAt: existing?.createdAt || new Date().toISOString(),
     };
     state.watchedWallets = [profile];
-  });
+  }, scopeFromPayload(payload));
 }
 
 async function activatePolicy(env: RuntimeEnv, payload: ActionPayload): Promise<PublicState> {
-  const current = publicState();
+  const scopeId = scopeFromPayload(payload);
+  const current = publicState(scopeId);
   if (!current.walletWatched || !current.watchedWallet) throw new Error("Set a real Mantle wallet first with /watch 0x...");
   const policy = activateMonitoringPolicy(payload.text);
 
@@ -217,18 +218,19 @@ async function activatePolicy(env: RuntimeEnv, payload: ActionPayload): Promise<
     state.recentTransactions = [];
     state.lastFrequencyAlertAt = 0;
     state.incidents = [];
-  });
+  }, scopeId);
   const proof = await commitPolicyProof(env, before);
 
   return mutateState((state) => {
     state.policyActive = true;
     state.policyTxHash = proof.txHash;
-  });
+  }, scopeId);
 }
 
 async function simulateTransfer(env: RuntimeEnv, payload: ActionPayload): Promise<PublicState> {
   if (!demoModeEnabled(env)) throw new Error("Demo simulation is disabled in production mode.");
-  const current = publicState();
+  const scopeId = scopeFromPayload(payload);
+  const current = publicState(scopeId);
   if (current.transferDetected && current.alertTxHash && !payload.force) return current;
 
   const policy = current.policy ?? activateMonitoringPolicy();
@@ -253,7 +255,7 @@ async function simulateTransfer(env: RuntimeEnv, payload: ActionPayload): Promis
     state.evidenceTxHash = evidenceTxHash;
     state.evidenceSource = "demo";
     state.recipient = recipient;
-  });
+  }, scopeId);
   const proof = await commitAlertProof(env, before, {
     evidenceTxHash,
     amountMnt: "25",
@@ -285,15 +287,16 @@ async function simulateTransfer(env: RuntimeEnv, payload: ActionPayload): Promis
     state.alertTxHash = proof.txHash;
     state.lastAlertHash = proof.alertHash || "";
     state.incidents.unshift(incident);
-  });
+  }, scopeId);
 }
 
-async function resolveAlert(env: RuntimeEnv, action: "expected" | "suspicious"): Promise<PublicState> {
-  const current = publicState();
+async function resolveAlert(env: RuntimeEnv, action: "expected" | "suspicious", payload: ActionPayload): Promise<PublicState> {
+  const scopeId = scopeFromPayload(payload);
+  const current = publicState(scopeId);
   if (current.resolved && current.outcomeTxHash) return current;
 
   const label: OutcomeLabel = action === "suspicious" ? "Suspicious Activity" : "Expected Transfer";
-  const fullState = mutateState((state) => state);
+  const fullState = mutateState((state) => state, scopeId);
   const proof = await commitOutcomeProof(env, fullState, label);
 
   return mutateState((state) => {
@@ -315,10 +318,10 @@ async function resolveAlert(env: RuntimeEnv, action: "expected" | "suspicious"):
       });
       state.feedbackExamples = state.feedbackExamples.slice(0, 25);
     }
-  });
+  }, scopeId);
 }
 
-function resetDemo(env: RuntimeEnv): AppState {
+function resetDemo(env: RuntimeEnv, payload: ActionPayload): AppState {
   return mutateState((state) => {
     const agentId = env.MANTSENT_AGENT_ID || state.agentId;
     Object.assign(state, {
@@ -355,19 +358,23 @@ function resetDemo(env: RuntimeEnv): AppState {
       openAiConfigured: isHostedAiConfigured(env, configuredProvider(env)),
       agentProfile: createAgentProfile(env, agentId),
     });
-  });
+  }, scopeFromPayload(payload));
 }
 
 function currentWatchedWallet(state: Pick<AppState, "watchedWallet" | "watchedWallets">): WatchedWalletProfile | undefined {
   return state.watchedWallets.find((wallet) => wallet.address.toLowerCase() === state.watchedWallet.toLowerCase());
 }
 
-function enableMonitor(): AppState {
+function enableMonitor(payload: ActionPayload): AppState {
   return mutateState((state) => {
     if (!state.walletWatched || !state.watchedWallet) throw new Error("Set a Mantle wallet first with /watch 0x...");
     if (!state.policyActive || !state.policy) throw new Error("Commit a policy first with /policy ...");
     state.monitorActive = true;
-  });
+  }, scopeFromPayload(payload));
+}
+
+function scopeFromPayload(payload: ActionPayload = {}): string {
+  return payload.scopeId || "default";
 }
 
 function defaultAgentUri(env: RuntimeEnv): string {
