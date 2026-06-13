@@ -254,6 +254,71 @@ code {
   text-transform: uppercase;
 }
 
+.label-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.info-tip {
+  position: relative;
+  z-index: 2;
+  display: inline-grid;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(218, 242, 239, 0.36);
+  border-radius: 50%;
+  color: var(--mantle-soft);
+  background: rgba(255, 255, 255, 0.055);
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1;
+  cursor: help;
+  outline: none;
+  vertical-align: text-top;
+}
+
+.info-tip em {
+  position: absolute;
+  right: 50%;
+  bottom: calc(100% + 10px);
+  width: min(280px, 72vw);
+  padding: 10px 11px;
+  border: 1px solid rgba(218, 242, 239, 0.24);
+  border-radius: 10px;
+  color: var(--text);
+  background: rgba(5, 8, 6, 0.97);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.42);
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 650;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  text-transform: none;
+  transform: translate(50%, 4px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+  white-space: normal;
+}
+
+.info-tip:hover,
+.info-tip:focus-visible {
+  border-color: rgba(143, 245, 200, 0.7);
+  background: rgba(143, 245, 200, 0.14);
+}
+
+.info-tip:hover em,
+.info-tip:focus-visible em {
+  opacity: 1;
+  transform: translate(50%, 0);
+}
+
 .hero-proof,
 .chart-panel,
 .analytics-card,

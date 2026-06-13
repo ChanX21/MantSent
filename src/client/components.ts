@@ -3,6 +3,28 @@ import { escapeHtml, proofValue, shortDisplay, txLink } from "./format.js";
 import type { AnalyticsSummary } from "./analytics.js";
 import type { PublicState } from "./types.js";
 
+export function tooltip(text: string): string {
+  return `
+    <span class="info-tip" tabindex="0" aria-label="${escapeHtml(text)}">
+      <span aria-hidden="true">i</span>
+      <em role="tooltip">${escapeHtml(text)}</em>
+    </span>
+  `;
+}
+
+export function labelWithTooltip(label: string, help: string): string {
+  return `<span class="label-tip">${escapeHtml(label)} ${tooltip(help)}</span>`;
+}
+
+export function panelTitle(eyebrow: string, title: string, help: string): string {
+  return `
+    <div>
+      <span class="eyebrow">${escapeHtml(eyebrow)}</span>
+      <h2>${escapeHtml(title)} ${tooltip(help)}</h2>
+    </div>
+  `;
+}
+
 export function alertCard(latest = state.incidents[0]): string {
   const amount = incidentAmount(latest);
   const recipient = latest?.recipient || agent.recipient || "Pending";
