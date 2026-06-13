@@ -16,6 +16,8 @@ COPY package.json package-lock.json ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/index.html ./index.html
+COPY --from=build /app/app.js ./app.js
+COPY --from=build /app/app.js.map ./app.js.map
 COPY --from=build /app/styles.css ./styles.css
 COPY --from=build /app/assets ./assets
 COPY --from=build /app/favicon.ico ./favicon.ico
