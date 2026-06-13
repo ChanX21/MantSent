@@ -30,7 +30,7 @@ The app supports a local agent profile and ERC-8004 Identity Registry registrati
 | Chain primitives | `src/server/chain/mantle.ts` | Provider, signer, ledger ABI, address/hash helpers. |
 | Telegram adapter | `src/server/telegram/telegram-service.ts` | Commands, inline buttons, branded status, proof links. |
 | HTTP adapter | `src/server/http/request-handler.ts` | API routes, Telegram webhook route, static assets. |
-| Persistence | `src/server/state/store.ts` | Local JSON state and public state projection. |
+| Persistence | `src/server/state/store.ts` | Scoped JSON/SQLite state, Telegram chat scopes, active monitor scope discovery, and public state projection. |
 | Shared contracts | `src/shared/types.ts` | Cross-surface types for state, policy, incidents, actions. |
 | Frontend state/API | `src/client/state.ts`, `src/client/api.ts` | Browser state sync and action calls. |
 | Frontend presentation | `src/client/views.ts`, `src/client/components.ts`, `src/client/render.ts` | Command, Passport, Evidence UI. |
@@ -47,7 +47,7 @@ or the `Enable Monitor` frontend action.
 
 The monitor:
 
-1. Loads active state from `data/mantsent-state.json`.
+1. Discovers active monitor scopes from JSON files or the SQLite `app_states` table.
 2. Requires at least one watched wallet and committed policy.
 3. Polls confirmed Mantle blocks with a small bounded window.
 4. Filters native MNT transactions where any watched wallet is sender or receiver.
@@ -55,8 +55,9 @@ The monitor:
 6. Flags configured known bridge/router/contract interactions using `MANTSENT_KNOWN_CONTRACTS`.
 7. Evaluates the movement with `policy-engine.ts`.
 8. Writes `AlertCommitted` only when the active policy is breached.
-9. Stores the block cursor, last checked time, last scanned block, and last error.
+9. Stores the block cursor, last checked time, last scanned block, and last error in the owning scope.
 10. Stores the incident so duplicate processing is avoided.
+11. Routes Telegram notifications to the owning chat scope, unless `TELEGRAM_ADMIN_CHAT_IDS` is configured as the deployment-wide notification target.
 
 Current monitor scope is native MNT, ERC-20 Transfer logs, and configured known contract interactions. It does not yet decode full swap routes, bridge completion semantics, failed transactions, NFT transfers, or gas anomalies.
 
@@ -126,10 +127,18 @@ The UI and Telegram must distinguish:
 
 Only ledger transaction hashes should link to Mantle explorer unless the evidence hash is a real transaction hash from the monitor.
 
+## Persistence And Auth
+
+`src/server/state/store.ts` exposes one state API with two backends:
+
+- `MANTSENT_STATE_BACKEND=json`: default local mode, with one JSON file per scope under `MANTSENT_STATE_DIR` or `data/`.
+- `MANTSENT_STATE_BACKEND=sqlite`: built-in local DB mode, with `app_states` and `telegram_accounts` tables in `MANTSENT_SQLITE_PATH`.
+
+Telegram chat ID is the first auth boundary. Mutating commands require the chat to be listed in `TELEGRAM_ADMIN_CHAT_IDS`; scoped state prevents one authorized chat from overwriting another chat's wallet, policy, incidents, and feedback examples. HTTP mutation remains protected by `MANTSENT_API_ADMIN_TOKEN`.
+
 ## Next Production Steps
 
-1. Replace local JSON state with Postgres/Supabase for multi-user operation.
-2. Add monitor health telemetry, retry accounting, and admin reset tooling.
-3. Add deeper receipt-level semantic indexing for full swap routes, bridge completion, failed transactions, and gas anomalies.
-4. Expand curated protocol/entity labels from deployment config into a maintained dataset.
-5. Expand monitor fixture tests with recorded real Mantle block/log payloads.
+1. Move the scoped state repository from SQLite to managed Postgres/Supabase for long-running hosted multi-user operation.
+2. Add deeper receipt-level semantic indexing for full swap routes, bridge completion, failed transactions, and gas anomalies.
+3. Expand curated protocol/entity labels from deployment config into a maintained dataset.
+4. Expand monitor fixture tests with recorded real Mantle block/log payloads.

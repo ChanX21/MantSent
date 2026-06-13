@@ -30,6 +30,19 @@ Telegram mutations are restricted to `TELEGRAM_ADMIN_CHAT_IDS`. To find your cha
 TELEGRAM_ADMIN_CHAT_IDS=123456789
 ```
 
+### Persistence And Operator Isolation
+
+MantSent supports scoped state per Telegram chat. The default local mode uses scoped JSON files under `data/`; hackathon deployments that need multiple judges/operators should use the built-in SQLite backend:
+
+```env
+MANTSENT_STATE_BACKEND=sqlite
+MANTSENT_SQLITE_PATH=data/mantsent.sqlite
+```
+
+Each Telegram chat maps to a scope like `telegram:518819057`, so one operator can deploy an agent, set wallets, commit a policy, and enable monitoring without overwriting another operator's session. The live monitor scans every active scope independently and routes alerts back to the owning Telegram chat, or to `TELEGRAM_ADMIN_CHAT_IDS` when admin IDs are configured.
+
+For hosted deployments, keep the SQLite file on a persistent volume. If the provider has no persistent disk, use JSON/SQLite only for demos and migrate the same scoped state model to managed Postgres after the hackathon.
+
 Agent defaults can be customized per deployment:
 
 ```env
@@ -101,7 +114,7 @@ Then message the bot configured by `TELEGRAM_BOT_TOKEN`:
 /proof
 ```
 
-Inline buttons are available for setup, ERC-8004 registration, hosted AI setup guidance, wallet changes, and outcome labels. `/brief` returns an investor/operator risk snapshot. `/simulate` is intentionally demo-only; live alerts come from the Mantle monitor after `/watch`, `/policy`, and `/monitor`.
+Inline buttons are intentionally limited to high-signal actions such as enabling monitoring and marking unresolved alerts as expected or suspicious. `/brief` returns an investor/operator risk snapshot. `/simulate` is intentionally demo-only; live alerts come from the Mantle monitor after `/watch`, `/policy`, and `/monitor`.
 
 Demo shortcuts are disabled by default. To expose `/demo` and demo wallet buttons in a non-production environment, set:
 
@@ -147,7 +160,7 @@ The code is split by operational responsibility so a future change can be assign
 | Mantle monitor | `src/server/monitor/mantle-monitor.ts` | Confirmed block polling, health telemetry, native transactions, ERC-20 Transfer logs, and known contract interactions. |
 | Telegram adapter | `src/server/telegram/telegram-service.ts` | Commands, inline buttons, polling, and Telegram API calls. |
 | HTTP adapter | `src/server/http/request-handler.ts` | `/api/state`, `/api/action`, webhook route, static file serving. |
-| Persistence | `src/server/state/store.ts` | Local JSON state and public state projection. |
+| Persistence | `src/server/state/store.ts` | Scoped JSON or SQLite state, Telegram chat scopes, active monitor scope discovery, and public state projection. |
 | Shared contracts | `src/shared/types.ts` | Cross-surface state, action, incident, and env types. |
 | Frontend state/API | `src/client/state.ts`, `src/client/api.ts` | Browser state sync and backend action calls. |
 | Frontend presentation | `src/client/views.ts`, `src/client/components.ts`, `src/client/render.ts`, `styles.css` | Command, Passport, Evidence UI and layout. |

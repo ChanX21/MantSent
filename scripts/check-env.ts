@@ -31,8 +31,21 @@ if (Number(env.MANTLE_CHAIN_ID) !== 5003 && Number(env.MANTLE_CHAIN_ID) !== 5000
 
 validateJsonArray("MANTSENT_ENTITY_LABELS", ["address", "label", "category", "importance"]);
 validateJsonArray("MANTSENT_KNOWN_CONTRACTS", ["address", "label", "type"]);
+validateStateBackend();
 
 console.log("MantSent environment is deployment-ready.");
+
+function validateStateBackend(): void {
+  const backend = String(env.MANTSENT_STATE_BACKEND || "json").toLowerCase();
+  if (backend !== "json" && backend !== "sqlite") {
+    console.error("MANTSENT_STATE_BACKEND must be json or sqlite.");
+    process.exit(1);
+  }
+  if (backend === "sqlite" && env.MANTSENT_SQLITE_PATH && !env.MANTSENT_SQLITE_PATH.endsWith(".sqlite")) {
+    console.error("MANTSENT_SQLITE_PATH should point to a .sqlite database file.");
+    process.exit(1);
+  }
+}
 
 function validateJsonArray(key: string, requiredFields: string[]): void {
   const value = env[key];
