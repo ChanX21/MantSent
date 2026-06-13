@@ -35,24 +35,24 @@ export function alertCard(latest = state.incidents[0]): string {
   return `
     <div class="alert-card">
       <div class="alert-top">
-        <span>${escapeHtml(signalType)} ${tooltip("The category assigned to the latest policy-matching wallet event.")}</span>
-        <strong>${score}/100 ${tooltip("Signal score from 0 to 100. Higher means the transfer pattern is more important for investor review.")}</strong>
+        <span>${escapeHtml(signalType)}</span>
+        <strong>${score}/100</strong>
       </div>
       <p>${escapeHtml(severity)} signal generated from the configured wallet policy and confirmed Mantle activity.</p>
       <div class="alert-facts">
-        <span>Amount ${tooltip("Value moved in the latest signal, shown as MNT or token units.")} ${escapeHtml(amount)}</span>
-        <span>Recipient ${tooltip("Counterparty address or entity that received the watched-wallet flow.")} ${escapeHtml(recipient)}</span>
-        <span>Policy ${tooltip("Operator-defined rule that caused this alert to be shown.")} ${escapeHtml(policyLabel())}</span>
-        <span>Evidence ${tooltip("Transaction hash or proof reference backing this signal.")} ${escapeHtml(shortDisplay(evidence))}</span>
+        <span>Amount ${escapeHtml(amount)}</span>
+        <span>Recipient ${escapeHtml(recipient)}</span>
+        <span>Policy ${escapeHtml(policyLabel())}</span>
+        <span>Evidence ${escapeHtml(shortDisplay(evidence))}</span>
       </div>
     </div>
   `;
 }
 
-export function metric(label: string, value: number | string, help: string): string {
+export function metric(label: string, value: number | string): string {
   return `
     <div class="metric">
-      ${labelWithTooltip(label, help)}
+      <span>${escapeHtml(label)}</span>
       <strong>${escapeHtml(value)}</strong>
     </div>
   `;
@@ -85,21 +85,21 @@ export function sparkBars(buckets: number[]): string {
 
 export function setupChecklist(): string {
   const rows = [
-    ["Agent profile", state.agentCreated, "Shows whether the local monitoring agent profile has been created."],
-    ["ERC-8004 identity", agent.identityStatus === "erc8004-registered", "Shows whether the agent identity has been registered through ERC-8004."],
-    ["Wallet scope", state.walletWatched, "Shows whether at least one Mantle wallet is attached to the watchlist."],
-    ["Policy", state.policyActive, "Shows whether an operator alert policy is currently active."],
-    ["Live monitor", state.monitorActive, "Shows whether Mantle polling is enabled for live wallet monitoring."],
+    ["Agent profile", state.agentCreated],
+    ["ERC-8004 identity", agent.identityStatus === "erc8004-registered"],
+    ["Wallet scope", state.walletWatched],
+    ["Policy", state.policyActive],
+    ["Live monitor", state.monitorActive],
   ] as const;
 
   return `
     <div class="setup-list">
       ${rows
         .map(
-          ([label, done, help]) => `
+          ([label, done]) => `
             <div class="setup-row ${done ? "done" : ""}">
               <span></span>
-              <strong>${labelWithTooltip(label, help)}</strong>
+              <strong>${escapeHtml(label)}</strong>
               <small>${done ? "Ready" : "Pending"}</small>
             </div>
           `,
@@ -122,11 +122,11 @@ export function signalTable(incidents: PublicState["incidents"]): string {
   return `
     <div class="signal-table">
       <div class="signal-row head">
-        <span>${labelWithTooltip("Signal", "Signal category assigned to the wallet event.")}</span>
-        <span>${labelWithTooltip("Score", "Numerical importance score from 0 to 100.")}</span>
-        <span>${labelWithTooltip("Outcome", "Operator review label: unresolved, expected transfer, or suspicious activity.")}</span>
-        <span>${labelWithTooltip("Amount", "Native MNT amount or ERC-20 token quantity involved.")}</span>
-        <span>${labelWithTooltip("Evidence", "Transaction hash or proof reference for verification.")}</span>
+        <span>Signal</span>
+        <span>Score</span>
+        <span>Outcome</span>
+        <span>Amount</span>
+        <span>Evidence</span>
       </div>
       ${incidents
         .map(
@@ -147,21 +147,21 @@ export function signalTable(incidents: PublicState["incidents"]): string {
 
 export function alphaRadar(summary: AnalyticsSummary): string {
   const rows = [
-    ["Peak signal", summary.peakScore, "Highest score among all rendered signals.", "Highest scored anomaly"],
-    ["Weighted risk", summary.weightedRiskScore, "Signal score adjusted by outcome and investor relevance.", "Outcome adjusted score"],
-    ["Average score", summary.averageScore, "Mean score across all signals.", "Mean signal intensity"],
-    ["Median score", summary.medianScore, "Middle score across all signals; less sensitive to one extreme alert.", "Central signal intensity"],
-    ["High relevance", summary.highRelevance, "Signals marked as high investor relevance.", "Investor-grade flags"],
-    ["Open reviews", summary.unresolved, "Signals still waiting for an operator outcome label.", "Needs operator label"],
+    ["Peak signal", summary.peakScore, "Highest scored anomaly"],
+    ["Weighted risk", summary.weightedRiskScore, "Outcome adjusted score"],
+    ["Average score", summary.averageScore, "Mean signal intensity"],
+    ["Median score", summary.medianScore, "Central signal intensity"],
+    ["High relevance", summary.highRelevance, "Investor-grade flags"],
+    ["Open reviews", summary.unresolved, "Needs operator label"],
   ] as const;
 
   return `
     <div class="alpha-radar">
       ${rows
         .map(
-          ([label, value, help, detail]) => `
+          ([label, value, detail]) => `
             <div>
-              ${labelWithTooltip(label, help)}
+              <span>${escapeHtml(label)}</span>
               <strong>${escapeHtml(value)}</strong>
               <small>${escapeHtml(detail)}</small>
             </div>
@@ -176,22 +176,22 @@ export function dataCoverage(summary: AnalyticsSummary): string {
   return `
     <div class="coverage-grid">
       <div>
-        ${labelWithTooltip("Native MNT", "Number of signals involving native Mantle MNT transfers.")}
+        <span>Native MNT</span>
         <strong>${summary.nativeSignals}</strong>
         <small>${summary.nativeRate}% of signals · ${formatNumber(summary.totalNativeMnt)} MNT</small>
       </div>
       <div>
-        ${labelWithTooltip("ERC-20 transfers", "Number of token transfer signals, separate from native MNT flow.")}
+        <span>ERC-20 transfers</span>
         <strong>${summary.erc20Signals}</strong>
         <small>${summary.erc20Rate}% of signals · ${formatNumber(summary.totalTokenAmount)} tokens</small>
       </div>
       <div>
-        ${labelWithTooltip("Contract interactions", "Signals involving known routers, bridges, protocols, or contract calls.")}
+        <span>Contract interactions</span>
         <strong>${summary.contractSignals}</strong>
         <small>Known protocol, router, bridge, or contract flow</small>
       </div>
       <div>
-        ${labelWithTooltip("Real Mantle coverage", "Percentage of signals backed by real Mantle transactions rather than demo events.")}
+        <span>Real Mantle coverage</span>
         <strong>${summary.realSignalRate}%</strong>
         <small>${summary.realSignals} real · ${summary.demoSignals} demo</small>
       </div>
@@ -204,7 +204,7 @@ export function signalTaxonomy(summary: AnalyticsSummary): string {
   if (!rows.length) return `<div class="empty-state compact-empty"><strong>No taxonomy yet</strong><p>Signal categories appear after policy matches.</p></div>`;
   return `
     <div class="taxonomy-list">
-      ${rows.map((row) => `<div>${labelWithTooltip(row.label, "Signal category share within the current incident set.")}<strong>${row.count}</strong><small>${row.percent}%</small></div>`).join("")}
+      ${rows.map((row) => `<div><span>${escapeHtml(row.label)}</span><strong>${row.count}</strong><small>${row.percent}%</small></div>`).join("")}
     </div>
   `;
 }
@@ -219,7 +219,7 @@ export function scoreDistribution(summary: AnalyticsSummary): string {
           const width = Math.round((count / max) * 100);
           return `
             <div>
-              ${labelWithTooltip(labels[index] || "Score bucket", "Count of signals whose score falls inside this range.")}
+              <span>${escapeHtml(labels[index] || "Score bucket")}</span>
               <strong>${count}</strong>
               <i style="--fill:${width}%"></i>
             </div>
@@ -247,27 +247,27 @@ export function reasonCodePanel(summary: AnalyticsSummary): string {
   if (!summary.reasonCodeBreakdown.length) return `<div class="empty-state compact-empty"><strong>No reason-code stats</strong><p>Reason codes appear after evaluated policy matches.</p></div>`;
   return `
     <div class="taxonomy-list">
-      ${summary.reasonCodeBreakdown.map((row) => `<div>${labelWithTooltip(row.label, "Policy engine reason that contributed to an alert.")}<strong>${row.count}</strong><small>${row.percent}%</small></div>`).join("")}
+      ${summary.reasonCodeBreakdown.map((row) => `<div><span>${escapeHtml(row.label)}</span><strong>${row.count}</strong><small>${row.percent}%</small></div>`).join("")}
     </div>
   `;
 }
 
 export function proofTimeline(): string {
   const rows = [
-    ["Agent identity", agent.identityStatus === "erc8004-registered", state.agentRegistrationTxHash, "Registration proof for the monitoring agent identity."],
-    ["Policy committed", state.policyActive, agent.policyTx, "Proof that the operator alert policy has been committed."],
-    ["Alert committed", state.transferDetected, agent.alertTx, "Proof that a policy-matching alert was committed."],
-    ["Outcome recorded", state.resolved, agent.outcomeTx, "Proof that the human review outcome was recorded."],
+    ["Agent identity", agent.identityStatus === "erc8004-registered", state.agentRegistrationTxHash],
+    ["Policy committed", state.policyActive, agent.policyTx],
+    ["Alert committed", state.transferDetected, agent.alertTx],
+    ["Outcome recorded", state.resolved, agent.outcomeTx],
   ] as const;
 
   return `
     <div class="proof-timeline">
       ${rows
         .map(
-          ([label, done, txHash, help]) => `
+          ([label, done, txHash]) => `
             <div class="${done ? "done" : ""}">
               <span></span>
-              <strong>${labelWithTooltip(label, help)}</strong>
+              <strong>${escapeHtml(label)}</strong>
               <small>${done ? proofValue(txHash) : "Pending"}</small>
             </div>
           `,
@@ -277,10 +277,10 @@ export function proofTimeline(): string {
   `;
 }
 
-export function statusBadge(label: string, value: string, tone: "good" | "warn" | "neutral" = "neutral", help = label): string {
+export function statusBadge(label: string, value: string, tone: "good" | "warn" | "neutral" = "neutral"): string {
   return `
     <div class="status-badge ${tone}">
-      ${labelWithTooltip(label, help)}
+      <span>${escapeHtml(label)}</span>
       <strong>${escapeHtml(value)}</strong>
     </div>
   `;

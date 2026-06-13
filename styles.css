@@ -284,8 +284,8 @@ code {
 
 .info-tip em {
   position: absolute;
-  right: 50%;
-  bottom: calc(100% + 10px);
+  top: calc(100% + 10px);
+  left: 50%;
   width: min(280px, 72vw);
   padding: 10px 11px;
   border: 1px solid rgba(218, 242, 239, 0.24);
@@ -300,7 +300,7 @@ code {
   opacity: 0;
   pointer-events: none;
   text-transform: none;
-  transform: translate(50%, 4px);
+  transform: translate(-50%, -4px);
   transition:
     opacity 140ms ease,
     transform 140ms ease;
@@ -316,7 +316,7 @@ code {
 .info-tip:hover em,
 .info-tip:focus-visible em {
   opacity: 1;
-  transform: translate(50%, 0);
+  transform: translate(-50%, 0);
 }
 
 .hero-proof,
@@ -364,7 +364,7 @@ code {
   min-height: 134px;
   min-width: 0;
   padding: 18px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .analytics-card span {
@@ -424,7 +424,7 @@ code {
 .chart-panel {
   grid-column: span 4;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .chart-panel.wide {
@@ -635,7 +635,7 @@ code {
 
 .proof-timeline div {
   display: grid;
-  grid-template-columns: 12px minmax(0, 0.8fr) minmax(0, 1.2fr);
+  grid-template-columns: 12px minmax(120px, 0.8fr) minmax(0, 1.2fr);
   gap: 10px;
   align-items: center;
   min-height: 54px;
@@ -660,6 +660,11 @@ code {
 
 .proof-timeline small {
   overflow-wrap: anywhere;
+}
+
+.proof-timeline strong,
+.setup-row strong {
+  line-height: 1.15;
 }
 
 .status-badge {
@@ -770,7 +775,7 @@ code {
 
 .setup-row {
   display: grid;
-  grid-template-columns: 10px minmax(0, 1fr) auto;
+  grid-template-columns: 10px minmax(120px, 1fr) auto;
   gap: 10px;
   align-items: center;
   min-height: 48px;

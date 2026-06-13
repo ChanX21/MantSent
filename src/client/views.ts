@@ -53,10 +53,10 @@ export function analyticsDashboardView(): string {
             ${sparkBars(analytics.activityBuckets)}
           </div>
           <div class="metric-strip">
-            ${metric("Total signals", analytics.totalSignals, "Total number of incidents currently returned by the backend state.")}
-            ${metric("Unresolved", analytics.unresolved, "Signals that still need an operator outcome label.")}
-            ${metric("Suspicious", analytics.suspicious, "Signals that the operator marked as suspicious activity.")}
-            ${metric("Real tx", analytics.realSignals, "Signals backed by actual Mantle transaction data.")}
+            ${metric("Total signals", analytics.totalSignals)}
+            ${metric("Unresolved", analytics.unresolved)}
+            ${metric("Suspicious", analytics.suspicious)}
+            ${metric("Real tx", analytics.realSignals)}
           </div>
         </article>
 
@@ -101,11 +101,11 @@ export function analyticsDashboardView(): string {
             ${panelTitle("Agent", agent.name || "MantSent Agent", "Current monitoring agent identity, AI provider, and health indicators.")}
           </div>
           <div class="status-stack">
-            ${statusBadge("Agent ID", `#${agent.id}`, state.agentCreated ? "good" : "warn", "Identifier for the currently configured MantSent monitoring agent.")}
-            ${statusBadge("Identity", agent.identityStatus === "erc8004-registered" ? "ERC-8004 registered" : "Local profile", agent.identityStatus === "erc8004-registered" ? "good" : "warn", "Shows whether the agent is registered on ERC-8004 or still local-only.")}
-            ${statusBadge("AI", aiLabel(), state.openAiConfigured ? "good" : "neutral", "Explanation provider used for alert summaries and reasoning.")}
-            ${statusBadge("Monitor health", monitorHealthLabel(analytics), state.monitorLastError || analytics.isMonitorStale ? "warn" : state.monitorLastCheckedAt ? "good" : "neutral", "Freshness of the polling loop and whether recent checks have errored or gone stale.")}
-            ${statusBadge("Latest signal age", analytics.latestAgeMinutes === null ? "Pending" : `${analytics.latestAgeMinutes}m`, analytics.latestAgeMinutes !== null && analytics.latestAgeMinutes <= 60 ? "good" : "neutral", "Minutes since the newest signal in the incident list was created.")}
+            ${statusBadge("Agent ID", `#${agent.id}`, state.agentCreated ? "good" : "warn")}
+            ${statusBadge("Identity", agent.identityStatus === "erc8004-registered" ? "ERC-8004 registered" : "Local profile", agent.identityStatus === "erc8004-registered" ? "good" : "warn")}
+            ${statusBadge("AI", aiLabel(), state.openAiConfigured ? "good" : "neutral")}
+            ${statusBadge("Monitor health", monitorHealthLabel(analytics), state.monitorLastError || analytics.isMonitorStale ? "warn" : state.monitorLastCheckedAt ? "good" : "neutral")}
+            ${statusBadge("Latest signal age", analytics.latestAgeMinutes === null ? "Pending" : `${analytics.latestAgeMinutes}m`, analytics.latestAgeMinutes !== null && analytics.latestAgeMinutes <= 60 ? "good" : "neutral")}
           </div>
         </article>
 
