@@ -182,6 +182,8 @@ For the Mirana Alpha & Data track, MantSent is positioned as wallet-risk and alp
 
 See `docs/JUDGING.md` for the scorecard mapping and demo script.
 
+See `docs/DEPLOYMENT.md` for non-AWS hackathon deployment notes.
+
 ## Guardrails
 
 MantSent reports policy-based anomaly signals. It does not claim theft detection, custody protection, guaranteed alpha, or trading advice. The UI uses operator-confirmed outcomes as feedback data, not as proof of model accuracy.
