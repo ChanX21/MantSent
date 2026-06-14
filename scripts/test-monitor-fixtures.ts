@@ -3,7 +3,7 @@ import type { TransactionResponse } from "ethers";
 import type { WatchedWalletProfile } from "../src/shared/types.js";
 import { lookupKnownContract } from "../src/server/entities/known-contracts.js";
 import { lookupEntityLabel } from "../src/server/entities/entity-labels.js";
-import { nativeWalletMatch, recentTransactionsForPolicy } from "../src/server/monitor/mantle-monitor.js";
+import { blockRanges, monitorPollIntervalMs, nativeWalletMatch, recentTransactionsForPolicy, shouldScanErc20Transfers, shouldScanNativeTransactions } from "../src/server/monitor/mantle-monitor.js";
 import { evaluateTransfer } from "../src/server/policy/policy-engine.js";
 import { parsePolicy } from "../src/server/policy/policy-parser.js";
 
@@ -49,6 +49,8 @@ assert.deepEqual(
 );
 
 const burstPolicy = parsePolicy("alert if more than 2 transactions happen in 5 minutes");
+assert.equal(shouldScanNativeTransactions(burstPolicy), true);
+assert.equal(shouldScanErc20Transfers(burstPolicy), false);
 const burstDecision = evaluateTransfer(
   burstPolicy,
   {
@@ -66,6 +68,8 @@ assert.equal(burstDecision.shouldAlert, true);
 assert.ok(burstDecision.reasonCodes.includes("TRANSACTION_FREQUENCY"));
 
 const contractPolicy = parsePolicy("alert on swap router interaction");
+assert.equal(shouldScanNativeTransactions(contractPolicy), true);
+assert.equal(shouldScanErc20Transfers(contractPolicy), true);
 const contractDecision = evaluateTransfer(
   contractPolicy,
   {
@@ -103,5 +107,12 @@ const env = {
 
 assert.equal(lookupEntityLabel(env, protocol.address)?.label, "Curated Protocol Treasury");
 assert.equal(lookupKnownContract(env, "0x6000000000000000000000000000000000000006")?.type, "router");
+assert.deepEqual(blockRanges(100, 123, 10), [
+  { fromBlock: 100, toBlock: 109 },
+  { fromBlock: 110, toBlock: 119 },
+  { fromBlock: 120, toBlock: 123 },
+]);
+assert.equal(monitorPollIntervalMs({ MANTSENT_MONITOR_POLL_MS: "45000" }), 45_000);
+assert.equal(monitorPollIntervalMs({ MANTSENT_MONITOR_POLL_MS: "1000" }), 30_000);
 
 console.log("Monitor fixture tests passed for native, burst, labels, and known-contract cases.");

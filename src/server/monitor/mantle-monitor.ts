@@ -8,18 +8,30 @@ import { lookupKnownContract } from "../entities/known-contracts.js";
 import { parsePolicy } from "../policy/policy-parser.js";
 import { activeMonitorScopes, loadState, mutateState } from "../state/store.js";
 
-const pollIntervalMs = 15_000;
+const defaultPollIntervalMs = 30_000;
+const minPollIntervalMs = 15_000;
 const confirmations = 2;
-const maxBlocksPerTick = 12;
+const maxBlocksPerTick = 10;
+const maxLogBlocksPerRequest = 10;
 const transferTopic = ethers.id("Transfer(address,address,uint256)");
 const erc20Abi = ["function symbol() view returns (string)", "function decimals() view returns (uint8)"] as const;
 const contractCodeCache = new Map<string, boolean>();
 
 export function startMantleMonitor(env: RuntimeEnv, onIncident?: (incident: Incident, scopeId: string) => Promise<void> | void): void {
   const rpc = provider(env);
+  const pollIntervalMs = monitorPollIntervalMs(env);
+  let tickInFlight = false;
 
   async function tick(): Promise<void> {
-    await Promise.all(activeMonitorScopes().map((scopeId) => tickScope(scopeId).catch((error) => recordMonitorError(error, scopeId))));
+    if (tickInFlight) return;
+    tickInFlight = true;
+    try {
+      for (const scopeId of activeMonitorScopes()) {
+        await tickScope(scopeId).catch((error) => recordMonitorError(error, scopeId));
+      }
+    } finally {
+      tickInFlight = false;
+    }
   }
 
   async function tickScope(scopeId: string): Promise<void> {
@@ -53,6 +65,12 @@ export function startMantleMonitor(env: RuntimeEnv, onIncident?: (incident: Inci
   }, pollIntervalMs);
 
   tick().catch((error) => recordMonitorError(error));
+}
+
+export function monitorPollIntervalMs(env: RuntimeEnv): number {
+  const configured = Number(env.MANTSENT_MONITOR_POLL_MS);
+  if (Number.isFinite(configured) && configured >= minPollIntervalMs) return configured;
+  return defaultPollIntervalMs;
 }
 
 function recordMonitorError(error: unknown, scopeId = "default"): void {
@@ -187,20 +205,23 @@ async function scanErc20Transfers(
   const state = loadState(scopeId);
   if (!state.monitorActive || !state.walletWatched || !state.policyActive || !state.watchedWallets.length) return;
   const watchedTopics = new Map(state.watchedWallets.map((wallet) => [ethers.zeroPadValue(wallet.address, 32).toLowerCase(), wallet]));
-  const logs = await rpc.getLogs({
-    fromBlock,
-    toBlock,
-    topics: [transferTopic],
-  });
 
-  for (const log of logs) {
-    if (log.topics.length < 3) continue;
-    const fromTopic = log.topics[1]?.toLowerCase();
-    const toTopic = log.topics[2]?.toLowerCase();
-    const outgoingWallet = fromTopic ? watchedTopics.get(fromTopic) : undefined;
-    const incomingWallet = toTopic ? watchedTopics.get(toTopic) : undefined;
-    if (outgoingWallet) await maybeProcessTokenTransfer(env, rpc, log, "outgoing", outgoingWallet, scopeId, onIncident);
-    if (incomingWallet && incomingWallet.address.toLowerCase() !== outgoingWallet?.address.toLowerCase()) await maybeProcessTokenTransfer(env, rpc, log, "incoming", incomingWallet, scopeId, onIncident);
+  for (const range of blockRanges(fromBlock, toBlock, maxLogBlocksPerRequest)) {
+    const logs = await rpc.getLogs({
+      fromBlock: range.fromBlock,
+      toBlock: range.toBlock,
+      topics: [transferTopic],
+    });
+
+    for (const log of logs) {
+      if (log.topics.length < 3) continue;
+      const fromTopic = log.topics[1]?.toLowerCase();
+      const toTopic = log.topics[2]?.toLowerCase();
+      const outgoingWallet = fromTopic ? watchedTopics.get(fromTopic) : undefined;
+      const incomingWallet = toTopic ? watchedTopics.get(toTopic) : undefined;
+      if (outgoingWallet) await maybeProcessTokenTransfer(env, rpc, log, "outgoing", outgoingWallet, scopeId, onIncident);
+      if (incomingWallet && incomingWallet.address.toLowerCase() !== outgoingWallet?.address.toLowerCase()) await maybeProcessTokenTransfer(env, rpc, log, "incoming", incomingWallet, scopeId, onIncident);
+    }
   }
 }
 
@@ -300,12 +321,21 @@ async function maybeProcessTokenTransfer(
   await onIncident?.(incident, scopeId);
 }
 
-function shouldScanNativeTransactions(policy: PolicyRule): boolean {
+export function shouldScanNativeTransactions(policy: PolicyRule): boolean {
   return policy.asset !== "ERC20";
 }
 
-function shouldScanErc20Transfers(policy: PolicyRule): boolean {
-  return policy.asset !== "MNT" || Boolean(policy.transactionCountThreshold);
+export function shouldScanErc20Transfers(policy: PolicyRule): boolean {
+  return policy.asset !== "MNT";
+}
+
+export function blockRanges(fromBlock: number, toBlock: number, maxBlocks: number): Array<{ fromBlock: number; toBlock: number }> {
+  const ranges = [];
+  const size = Math.max(1, maxBlocks);
+  for (let start = fromBlock; start <= toBlock; start += size) {
+    ranges.push({ fromBlock: start, toBlock: Math.min(toBlock, start + size - 1) });
+  }
+  return ranges;
 }
 
 export function nativeWalletMatch(

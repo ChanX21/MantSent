@@ -239,6 +239,7 @@ export interface RuntimeEnv {
   MANTSENT_SQLITE_PATH?: string;
   MANTSENT_ENTITY_LABELS?: string;
   MANTSENT_KNOWN_CONTRACTS?: string;
+  MANTSENT_MONITOR_POLL_MS?: string;
   AI_PROVIDER?: AiProvider;
   OPENAI_MODEL?: string;
   OPENAI_API_KEY?: string;
