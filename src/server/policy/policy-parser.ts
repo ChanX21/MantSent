@@ -125,8 +125,11 @@ function policyAstFromText(input: {
 }
 
 function policyLogicFromText(text: string): PolicyLogic {
-  if (/\b(or|either)\b/i.test(text) && !/\b(and)\b/i.test(text)) return "OR";
-  if (/\b(or|either)\b/i.test(text) && /\b(and)\b/i.test(text)) return "OR";
+  const explicitLogicText = text
+    .replace(/\b\d+(?:\.\d+)?\s*(?:MNT|mantle|tokens?|USDC|USDT|WETH|WMNT|METH|CMETH|FBTC)\s+or more\b/gi, "")
+    .replace(/\b\d+(?:\.\d+)?\s+or more\s*(?:transactions?|txs?|txns?|transfers?|xfers?|calls?|times?|occurrences?|events?)\b/gi, "");
+  if (/\b(or|either)\b/i.test(explicitLogicText) && !/\b(and)\b/i.test(explicitLogicText)) return "OR";
+  if (/\b(or|either)\b/i.test(explicitLogicText) && /\b(and)\b/i.test(explicitLogicText)) return "OR";
   return "AND";
 }
 
@@ -135,7 +138,7 @@ function amountThresholdMentioned(text: string): boolean {
 }
 
 function comparisonOpFromText(text: string): PolicyComparisonOp {
-  if (/(?:at least|minimum of|min\.?|>=|greater than or equal to)/i.test(text)) return ">=";
+  if (/(?:at least|minimum of|min\.?|>=|greater than or equal to|\bor more\b)/i.test(text)) return ">=";
   if (/\b(exactly|equal to|=)\b/i.test(text)) return "=";
   return ">";
 }
@@ -198,7 +201,7 @@ function anyTransactionPolicy(text: string): boolean {
 }
 
 function frequencyPolicy(text: string): { count: number; windowSeconds: number } | null {
-  if (!/\b(multiple|many|several|burst|too many|rapid|repeated|frequent|frequency|velocity)\b.*\b(transaction|transactions|tx|txs|txn|txns|transfer|transfers|xfer|xfers|call|calls)\b|\b(transaction|transactions|tx|txs|txn|txns|transfer|transfers|xfer|xfers|call|calls)\b.*\b(within|in|over|per|inside|during|under|window|minutes?|mins?|hours?|hrs?|seconds?|secs?)\b/i.test(text)) return null;
+  if (!/\b(multiple|many|several|burst|too many|rapid|repeated|frequent|frequency|velocity)\b.*\b(transaction|transactions|tx|txs|txn|txns|transfer|transfers|xfer|xfers|call|calls|time|times|occurrence|occurrences|event|events)\b|\b(transaction|transactions|tx|txs|txn|txns|transfer|transfers|xfer|xfers|call|calls|time|times|occurrence|occurrences|event|events)\b.*\b(within|in|over|per|inside|during|under|window|minutes?|mins?|hours?|hrs?|seconds?|secs?)\b/i.test(text)) return null;
   const count = countFromText(text);
   const windowSeconds = windowSecondsFromText(text);
   return {
@@ -256,13 +259,13 @@ function tokenSymbolFromText(text: string): string | undefined {
 }
 
 function countFromText(text: string): number {
-  const exclusiveMatch = text.match(/(?:more than|over|above|>)\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:transaction|transactions|tx|txs|txn|txns|transfer|transfers|xfer|xfers|call|calls)\b/i);
+  const exclusiveMatch = text.match(/(?:more than|over|above|>)\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:transaction|transactions|tx|txs|txn|txns|transfer|transfers|xfer|xfers|call|calls|time|times|occurrence|occurrences|event|events)\b/i);
   if (exclusiveMatch?.[1]) return numberWord(exclusiveMatch[1]) + 1;
 
   const inclusiveMatch =
-    text.match(/(?:at least|minimum of|min\.?|>=|greater than or equal to)\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:transaction|transactions|tx|txs|txn|txns|transfer|transfers|xfer|xfers|call|calls)\b/i) ??
-    text.match(/(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:or more|\+)\s*(?:transaction|transactions|tx|txs|txn|txns|transfer|transfers|xfer|xfers|call|calls)\b/i) ??
-    text.match(/(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:transaction|transactions|tx|txs|txn|txns|transfer|transfers|xfer|xfers|call|calls)\b/i);
+    text.match(/(?:at least|minimum of|min\.?|>=|greater than or equal to)\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:transaction|transactions|tx|txs|txn|txns|transfer|transfers|xfer|xfers|call|calls|time|times|occurrence|occurrences|event|events)\b/i) ??
+    text.match(/(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:or more|\+)\s*(?:transaction|transactions|tx|txs|txn|txns|transfer|transfers|xfer|xfers|call|calls|time|times|occurrence|occurrences|event|events)\b/i) ??
+    text.match(/(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:transaction|transactions|tx|txs|txn|txns|transfer|transfers|xfer|xfers|call|calls|time|times|occurrence|occurrences|event|events)\b/i);
   if (inclusiveMatch?.[1]) return numberWord(inclusiveMatch[1]);
 
   if (/\b(couple|multiple)\b/i.test(text)) return 2;

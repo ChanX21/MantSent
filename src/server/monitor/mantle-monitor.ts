@@ -1,5 +1,5 @@
 import { ethers, type Log, type TransactionResponse } from "ethers";
-import type { Incident, RuntimeEnv, WatchedWalletProfile } from "../../shared/types.js";
+import type { Incident, PolicyRule, RuntimeEnv, WatchedWalletProfile } from "../../shared/types.js";
 import { buildIncident, evaluateAgentTransfer } from "../agent/single-wallet-monitoring-agent.js";
 import { createAgentLlmProvider } from "../agent/llm/provider-factory.js";
 import { formatMnt, normalizeAddress, provider } from "../chain/mantle.js";
@@ -32,10 +32,13 @@ export function startMantleMonitor(env: RuntimeEnv, onIncident?: (incident: Inci
     const toBlock = Math.min(safeLatest, fromBlock + maxBlocksPerTick - 1);
     if (toBlock < fromBlock) return;
 
-    for (let blockNumber = fromBlock; blockNumber <= toBlock; blockNumber += 1) {
-      await scanBlock(env, blockNumber, scopeId, onIncident);
-      await scanErc20Transfers(env, blockNumber, scopeId, onIncident);
+    const policy = state.policy ?? parsePolicy();
+    if (shouldScanNativeTransactions(policy)) {
+      for (let blockNumber = fromBlock; blockNumber <= toBlock; blockNumber += 1) {
+        await scanBlock(env, rpc, blockNumber, scopeId, onIncident);
+      }
     }
+    if (shouldScanErc20Transfers(policy)) await scanErc20Transfers(env, rpc, fromBlock, toBlock, scopeId, onIncident);
 
     mutateState((current) => {
       current.monitorCursorBlock = Math.max(current.monitorCursorBlock, toBlock);
@@ -61,21 +64,31 @@ function recordMonitorError(error: unknown, scopeId = "default"): void {
   }, scopeId);
 }
 
-async function scanBlock(env: RuntimeEnv, blockNumber: number, scopeId: string, onIncident?: (incident: Incident, scopeId: string) => Promise<void> | void): Promise<void> {
-  const rpc = provider(env);
+async function scanBlock(
+  env: RuntimeEnv,
+  rpc: ethers.Provider,
+  blockNumber: number,
+  scopeId: string,
+  onIncident?: (incident: Incident, scopeId: string) => Promise<void> | void,
+): Promise<void> {
   const block = await rpc.getBlock(blockNumber, true);
   if (!block) return;
 
   for (const tx of block.prefetchedTransactions) {
-    await maybeProcessTransaction(env, tx, scopeId, onIncident);
+    await maybeProcessTransaction(env, rpc, tx, scopeId, onIncident);
   }
 }
 
-async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse, scopeId: string, onIncident?: (incident: Incident, scopeId: string) => Promise<void> | void): Promise<void> {
+async function maybeProcessTransaction(
+  env: RuntimeEnv,
+  rpc: ethers.Provider,
+  tx: TransactionResponse,
+  scopeId: string,
+  onIncident?: (incident: Incident, scopeId: string) => Promise<void> | void,
+): Promise<void> {
   const state = loadState(scopeId);
   if (!state.monitorActive || !state.walletWatched || !state.policyActive || !state.watchedWallets.length) return;
   if (!tx.to) return;
-  const rpc = provider(env);
   const match = nativeWalletMatch(state.watchedWallets, tx);
   if (!match) return;
   if (state.incidents.some((incident) => incident.evidenceTxHash.toLowerCase() === tx.hash.toLowerCase())) return;
@@ -163,16 +176,20 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
   await onIncident?.(incident, scopeId);
 }
 
-async function scanErc20Transfers(env: RuntimeEnv, blockNumber: number, scopeId: string, onIncident?: (incident: Incident, scopeId: string) => Promise<void> | void): Promise<void> {
+async function scanErc20Transfers(
+  env: RuntimeEnv,
+  rpc: ethers.Provider,
+  fromBlock: number,
+  toBlock: number,
+  scopeId: string,
+  onIncident?: (incident: Incident, scopeId: string) => Promise<void> | void,
+): Promise<void> {
   const state = loadState(scopeId);
   if (!state.monitorActive || !state.walletWatched || !state.policyActive || !state.watchedWallets.length) return;
-  const policy = state.policy ?? parsePolicy();
-  if (policy.asset === "MNT" && !policy.transactionCountThreshold) return;
-  const rpc = provider(env);
   const watchedTopics = new Map(state.watchedWallets.map((wallet) => [ethers.zeroPadValue(wallet.address, 32).toLowerCase(), wallet]));
   const logs = await rpc.getLogs({
-    fromBlock: blockNumber,
-    toBlock: blockNumber,
+    fromBlock,
+    toBlock,
     topics: [transferTopic],
   });
 
@@ -182,19 +199,26 @@ async function scanErc20Transfers(env: RuntimeEnv, blockNumber: number, scopeId:
     const toTopic = log.topics[2]?.toLowerCase();
     const outgoingWallet = fromTopic ? watchedTopics.get(fromTopic) : undefined;
     const incomingWallet = toTopic ? watchedTopics.get(toTopic) : undefined;
-    if (outgoingWallet) await maybeProcessTokenTransfer(env, log, "outgoing", outgoingWallet, scopeId, onIncident);
-    if (incomingWallet && incomingWallet.address.toLowerCase() !== outgoingWallet?.address.toLowerCase()) await maybeProcessTokenTransfer(env, log, "incoming", incomingWallet, scopeId, onIncident);
+    if (outgoingWallet) await maybeProcessTokenTransfer(env, rpc, log, "outgoing", outgoingWallet, scopeId, onIncident);
+    if (incomingWallet && incomingWallet.address.toLowerCase() !== outgoingWallet?.address.toLowerCase()) await maybeProcessTokenTransfer(env, rpc, log, "incoming", incomingWallet, scopeId, onIncident);
   }
 }
 
-async function maybeProcessTokenTransfer(env: RuntimeEnv, log: Log, direction: "incoming" | "outgoing", watchedWalletProfile: WatchedWalletProfile, scopeId: string, onIncident?: (incident: Incident, scopeId: string) => Promise<void> | void): Promise<void> {
+async function maybeProcessTokenTransfer(
+  env: RuntimeEnv,
+  rpc: ethers.Provider,
+  log: Log,
+  direction: "incoming" | "outgoing",
+  watchedWalletProfile: WatchedWalletProfile,
+  scopeId: string,
+  onIncident?: (incident: Incident, scopeId: string) => Promise<void> | void,
+): Promise<void> {
   const state = loadState(scopeId);
   if (!state.monitorActive || !state.walletWatched || !state.policyActive || !state.watchedWallets.length) return;
   const evidenceKey = `${watchedWalletProfile.address}:${log.transactionHash}:${log.index}`;
   if (state.incidents.some((incident) => (incident.evidenceKey || incident.evidenceTxHash).toLowerCase() === evidenceKey.toLowerCase())) return;
 
   const policy = state.policy ?? parsePolicy();
-  const rpc = provider(env);
   const token = await tokenMetadata(rpc, log.address);
   const amountRaw = BigInt(log.data);
   const amount = Number(ethers.formatUnits(amountRaw, token.decimals));
@@ -274,6 +298,14 @@ async function maybeProcessTokenTransfer(env: RuntimeEnv, log: Log, direction: "
     current.incidents.unshift(incident);
   }, scopeId);
   await onIncident?.(incident, scopeId);
+}
+
+function shouldScanNativeTransactions(policy: PolicyRule): boolean {
+  return policy.asset !== "ERC20";
+}
+
+function shouldScanErc20Transfers(policy: PolicyRule): boolean {
+  return policy.asset !== "MNT" || Boolean(policy.transactionCountThreshold);
 }
 
 export function nativeWalletMatch(

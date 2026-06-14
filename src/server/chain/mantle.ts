@@ -13,8 +13,17 @@ export const ledgerAbi = [
 
 export type SignalLedger = ethers.Contract;
 
+const providerCache = new Map<string, ethers.JsonRpcProvider>();
+
 export function provider(env: RuntimeEnv): ethers.JsonRpcProvider {
-  return new ethers.JsonRpcProvider(env.MANTLE_RPC_URL, Number(env.MANTLE_CHAIN_ID));
+  const chainId = Number(env.MANTLE_CHAIN_ID);
+  const key = `${env.MANTLE_RPC_URL || ""}:${chainId}`;
+  const cached = providerCache.get(key);
+  if (cached) return cached;
+
+  const rpc = new ethers.JsonRpcProvider(env.MANTLE_RPC_URL, chainId, { staticNetwork: true });
+  providerCache.set(key, rpc);
+  return rpc;
 }
 
 export function wallet(env: RuntimeEnv): ethers.Wallet {

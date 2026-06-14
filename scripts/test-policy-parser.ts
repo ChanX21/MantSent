@@ -13,6 +13,8 @@ type Expected = {
   includeZero?: boolean;
   threshold?: number;
   thresholdToken?: number;
+  logic?: "AND" | "OR";
+  amountOp?: ">" | ">=" | "=";
 };
 
 const burstCases: Array<[string, Expected]> = [
@@ -48,6 +50,7 @@ const burstCases: Array<[string, Expected]> = [
   ["outgoing more than 2 txns in 5 mins", { count: 3, windowSeconds: 300, direction: "outgoing" }],
   ["alert if sent 3 transactions in 5 mins", { count: 3, windowSeconds: 300, direction: "outgoing" }],
   ["alert if received 3 transactions in 5 mins", { count: 3, windowSeconds: 300, direction: "incoming" }],
+  ["alert me if 5 MNT or more leaves my wallet 2 times within 5 minutes", { count: 2, windowSeconds: 300, direction: "outgoing", threshold: 5, logic: "AND", amountOp: ">=" }],
 ];
 
 const anyCases: Array<[string, Expected]> = [
@@ -128,7 +131,7 @@ const unsupportedCases = [
 ];
 
 const supportedCases = [...burstCases, ...anyCases, ...thresholdCases, ...tokenCases, ...contractCases];
-assert.equal(supportedCases.length + unsupportedCases.length, 94);
+assert.equal(supportedCases.length + unsupportedCases.length, 95);
 
 for (const [text, expected] of supportedCases) {
   const policy = parsePolicy(text);
@@ -143,6 +146,11 @@ for (const [text, expected] of supportedCases) {
   if (expected.includeZero !== undefined) assert.equal(policy.includeZeroValue, expected.includeZero, text);
   if (expected.threshold !== undefined) assert.equal(policy.thresholdMnt, expected.threshold, text);
   if (expected.thresholdToken !== undefined) assert.equal(policy.thresholdToken, expected.thresholdToken, text);
+  if (expected.logic !== undefined) assert.equal(policy.ast?.logic, expected.logic, text);
+  if (expected.amountOp !== undefined) {
+    const amountCondition = policy.ast?.conditions.find((condition) => condition.type === "transfer_amount");
+    assert.equal(amountCondition?.op, expected.amountOp, text);
+  }
 }
 
 for (const text of unsupportedCases) {

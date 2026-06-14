@@ -93,6 +93,41 @@ assert.equal(
   true,
 );
 
+const repeatedThresholdPolicy = parsePolicy("alert me if 5 MNT or more leaves my wallet 2 times within 5 minutes");
+assert.equal(repeatedThresholdPolicy.ast?.logic, "AND");
+assert.equal(
+  evaluateTransfer(
+    repeatedThresholdPolicy,
+    {
+      hash: "0xrepeated-first",
+      from: "0xsource",
+      to: knownRecipient,
+      asset: "MNT",
+      amountMnt: 6,
+      direction: "outgoing",
+      recentTransactionCount: 1,
+    },
+    [knownRecipient],
+  ).shouldAlert,
+  false,
+);
+assert.equal(
+  evaluateTransfer(
+    repeatedThresholdPolicy,
+    {
+      hash: "0xrepeated-second",
+      from: "0xsource",
+      to: knownRecipient,
+      asset: "MNT",
+      amountMnt: 6,
+      direction: "outgoing",
+      recentTransactionCount: 2,
+    },
+    [knownRecipient],
+  ).shouldAlert,
+  true,
+);
+
 const tokenPolicy = parsePolicy("alert if more than 1000 USDC leaves this wallet");
 assert.equal(
   evaluateTransfer(
