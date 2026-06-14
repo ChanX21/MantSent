@@ -163,11 +163,18 @@ MANTSENT_ENABLE_DEMO_MODE=true
 
 ## Policy Compiler
 
-MantSent compiles natural-language policies into deterministic rules before monitoring starts. The parser supports amount thresholds, incoming/outgoing direction, transaction frequency windows, any-transaction rules, ERC-20 token thresholds, first-seen counterparty escalation, and known bridge/router/contract interactions.
+MantSent compiles natural-language policies into deterministic rules before monitoring starts. The parser supports amount thresholds, incoming/outgoing direction, transaction frequency windows, any-transaction rules, ERC-20 token thresholds, first-seen counterparty escalation, contract counterparties, known bridge/router/contract interactions, and deterministic unauthorized-outgoing risk heuristics.
 
 Policies are represented internally as a structured AST with `AND`/`OR` logic where supported. The LLM is not allowed to decide whether an alert fires; it can only explain a policy match after the deterministic engine has evaluated the transaction.
 
 Unsupported categories such as NFT transfers, gas spikes, failed transactions, and arbitrary contract event semantics are rejected instead of silently guessed.
+
+Examples:
+
+```text
+/policy Alert me if the incoming transaction is from a contract and it has more than 5 MNT
+/policy Alert me if you suspect outgoing unauthorized transactions
+```
 
 ## Shipping Award Readiness
 

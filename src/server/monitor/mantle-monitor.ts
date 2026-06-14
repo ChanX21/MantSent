@@ -13,6 +13,7 @@ const confirmations = 2;
 const maxBlocksPerTick = 12;
 const transferTopic = ethers.id("Transfer(address,address,uint256)");
 const erc20Abi = ["function symbol() view returns (string)", "function decimals() view returns (uint8)"] as const;
+const contractCodeCache = new Map<string, boolean>();
 
 export function startMantleMonitor(env: RuntimeEnv, onIncident?: (incident: Incident, scopeId: string) => Promise<void> | void): void {
   const rpc = provider(env);
@@ -74,6 +75,7 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
   const state = loadState(scopeId);
   if (!state.monitorActive || !state.walletWatched || !state.policyActive || !state.watchedWallets.length) return;
   if (!tx.to) return;
+  const rpc = provider(env);
   const match = nativeWalletMatch(state.watchedWallets, tx);
   if (!match) return;
   if (state.incidents.some((incident) => incident.evidenceTxHash.toLowerCase() === tx.hash.toLowerCase())) return;
@@ -83,6 +85,7 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
   if (tx.value <= 0n && !policy.includeZeroValue && !policy.triggerOnAnyTransaction && !policy.transactionCountThreshold && !policy.contractInteraction) return;
   const amountMnt = Number(formatMnt(tx.value));
   const recipient = normalizeAddress(match.direction === "outgoing" ? tx.to : tx.from);
+  const counterpartyIsContract = Boolean(knownContract) || (await isContractAddress(rpc, recipient));
   const timestamp = Math.floor(Date.now() / 1000);
   const recentTransactions = recentTransactionsForPolicy(state.recentTransactions || [], `${match.wallet.address}:${tx.hash}`, timestamp, policy.transactionWindowSeconds);
   const decision = evaluateAgentTransfer(
@@ -94,6 +97,7 @@ async function maybeProcessTransaction(env: RuntimeEnv, tx: TransactionResponse,
       asset: "MNT",
       contractInteraction: Boolean(knownContract),
       contractType: knownContract?.type,
+      counterpartyIsContract,
       amountMnt,
       direction: match.direction,
       recentTransactionCount: recentTransactions.length,
@@ -197,6 +201,7 @@ async function maybeProcessTokenTransfer(env: RuntimeEnv, log: Log, direction: "
   const from = normalizeAddress(ethers.dataSlice(log.topics[1] || "0x", 12));
   const to = normalizeAddress(ethers.dataSlice(log.topics[2] || "0x", 12));
   const recipient = direction === "outgoing" ? to : from;
+  const counterpartyIsContract = await isContractAddress(rpc, recipient);
   const timestamp = Math.floor(Date.now() / 1000);
   const recentTransactions = recentTransactionsForPolicy(state.recentTransactions || [], evidenceKey, timestamp, policy.transactionWindowSeconds);
   const decision = evaluateAgentTransfer(
@@ -207,6 +212,7 @@ async function maybeProcessTokenTransfer(env: RuntimeEnv, log: Log, direction: "
       to: recipient,
       asset: "ERC20",
       tokenSymbol: token.symbol,
+      counterpartyIsContract,
       amountMnt: amount,
       direction,
       recentTransactionCount: recentTransactions.length,
@@ -291,6 +297,16 @@ async function tokenMetadata(rpc: ethers.Provider, tokenAddress: string): Promis
     contract.getFunction("decimals").staticCall().catch(() => 18),
   ]);
   return { symbol: String(symbol), decimals: Number(decimals) };
+}
+
+async function isContractAddress(rpc: ethers.Provider, address: string): Promise<boolean> {
+  const normalized = address.toLowerCase();
+  const cached = contractCodeCache.get(normalized);
+  if (cached !== undefined) return cached;
+  const code = await rpc.getCode(address).catch(() => "0x");
+  const isContract = code !== "0x";
+  contractCodeCache.set(normalized, isContract);
+  return isContract;
 }
 
 export function recentTransactionsForPolicy(

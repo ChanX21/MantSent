@@ -130,4 +130,74 @@ assert.equal(
   true,
 );
 
-console.log("Policy engine tests passed for AST AND/OR, token, frequency, and contract policies.");
+const incomingContractPolicy = parsePolicy("alert me if the incoming transaction is from a contract and it has more than 5 MNT");
+assert.equal(incomingContractPolicy.ast?.logic, "AND");
+assert.ok(incomingContractPolicy.ast?.conditions.some((condition) => condition.type === "counterparty_kind"));
+assert.ok(incomingContractPolicy.ast?.conditions.some((condition) => condition.type === "transfer_amount"));
+assert.equal(
+  evaluateTransfer(
+    incomingContractPolicy,
+    {
+      hash: "0xincoming-contract",
+      from: "0xcontract",
+      to: "0xwatched",
+      asset: "MNT",
+      amountMnt: 6,
+      direction: "incoming",
+      counterpartyIsContract: true,
+    },
+    [],
+  ).shouldAlert,
+  true,
+);
+assert.equal(
+  evaluateTransfer(
+    incomingContractPolicy,
+    {
+      hash: "0xincoming-eoa",
+      from: "0xeoa",
+      to: "0xwatched",
+      asset: "MNT",
+      amountMnt: 6,
+      direction: "incoming",
+      counterpartyIsContract: false,
+    },
+    [],
+  ).shouldAlert,
+  false,
+);
+
+const unauthorizedPolicy = parsePolicy("alert me if you suspect outgoing unauthorized transactions");
+assert.ok(unauthorizedPolicy.ast?.conditions.some((condition) => condition.type === "risk_heuristic"));
+assert.equal(
+  evaluateTransfer(
+    unauthorizedPolicy,
+    {
+      hash: "0xunauthorized",
+      from: "0xwatched",
+      to: "0xnew",
+      asset: "MNT",
+      amountMnt: 0.01,
+      direction: "outgoing",
+    },
+    [],
+  ).shouldAlert,
+  true,
+);
+assert.equal(
+  evaluateTransfer(
+    unauthorizedPolicy,
+    {
+      hash: "0xincoming-unauthorized",
+      from: "0xsource",
+      to: "0xwatched",
+      asset: "MNT",
+      amountMnt: 10,
+      direction: "incoming",
+    },
+    [],
+  ).shouldAlert,
+  false,
+);
+
+console.log("Policy engine tests passed for AST AND/OR, token, frequency, contract-counterparty, and risk-heuristic policies.");

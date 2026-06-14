@@ -20,6 +20,8 @@ export function parsePolicy(text = ""): PolicyRule {
     triggerOnAnyTransaction,
     contractInteraction,
     contractTypes: contractTypesFromText(cleanText),
+    contractCounterparty: contractCounterpartyPolicy(cleanText),
+    unauthorizedOutgoing: unauthorizedOutgoingPolicy(cleanText),
   });
   return {
     asset,
@@ -50,6 +52,8 @@ function policyAstFromText(input: {
   triggerOnAnyTransaction: boolean;
   contractInteraction: boolean;
   contractTypes?: string[];
+  contractCounterparty: boolean;
+  unauthorizedOutgoing: boolean;
 }): PolicyAst {
   const conditions: PolicyCondition[] = [];
   const logic = policyLogicFromText(input.text);
@@ -72,7 +76,7 @@ function policyAstFromText(input: {
     });
   }
 
-  if (amountThresholdMentioned(input.text) || (!conditions.length && !input.contractInteraction)) {
+  if (amountThresholdMentioned(input.text) || (!conditions.length && !input.contractInteraction && !input.contractCounterparty && !input.unauthorizedOutgoing)) {
     conditions.push({
       type: "transfer_amount",
       asset: input.asset,
@@ -94,6 +98,22 @@ function policyAstFromText(input: {
     conditions.push({
       type: "contract_interaction",
       contractTypes: input.contractTypes,
+    });
+  }
+
+  if (input.contractCounterparty) {
+    conditions.push({
+      type: "counterparty_kind",
+      direction: input.direction,
+      kind: "contract",
+    });
+  }
+
+  if (input.unauthorizedOutgoing) {
+    conditions.push({
+      type: "risk_heuristic",
+      kind: "unauthorized_outgoing",
+      direction: "outgoing",
     });
   }
 
@@ -146,6 +166,8 @@ function compiledSummary(ast: PolicyAst): string[] {
     }
     if (condition.type === "any_transaction") return `${condition.direction} any ${condition.asset} transaction`;
     if (condition.type === "new_counterparty") return `${condition.direction} new counterparty required`;
+    if (condition.type === "counterparty_kind") return `${condition.direction} counterparty is a ${condition.kind}`;
+    if (condition.type === "risk_heuristic") return "unauthorized outgoing risk heuristic";
     return `known contract interaction${condition.contractTypes?.length ? `: ${condition.contractTypes.join(", ")}` : ""}`;
   });
 }
@@ -202,6 +224,14 @@ function assertSupportedPolicy(text: string): void {
 
 function contractInteractionPolicy(text: string): boolean {
   return /\b(bridge|bridging|swap|router|known contract|contract interaction|protocol contract)\b/i.test(text);
+}
+
+function contractCounterpartyPolicy(text: string): boolean {
+  return /\b(from|to|counterparty|recipient|sender|source|destination)\b.{0,24}\b(contract|smart contract)\b|\b(contract|smart contract)\b.{0,24}\b(sender|source|recipient|destination|counterparty)\b/i.test(text);
+}
+
+function unauthorizedOutgoingPolicy(text: string): boolean {
+  return /\b(suspect|suspected|suspicious|unauthorized|unauthorised|unexpected|abnormal|anomalous|risky)\b.{0,50}\b(outgoing|outbound|outflow|withdrawal|withdrawals|sent|send|spend|debit|transfer|transactions?|txs?)\b|\b(outgoing|outbound|outflow|withdrawal|withdrawals|sent|send|spend|debit|transfer|transactions?|txs?)\b.{0,50}\b(suspect|suspected|suspicious|unauthorized|unauthorised|unexpected|abnormal|anomalous|risky)\b/i.test(text);
 }
 
 function contractTypesFromText(text: string): string[] | undefined {

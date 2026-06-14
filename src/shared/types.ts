@@ -101,6 +101,16 @@ export type PolicyCondition =
   | {
       type: "contract_interaction";
       contractTypes?: string[];
+    }
+  | {
+      type: "counterparty_kind";
+      direction: "incoming" | "outgoing" | "both";
+      kind: "contract";
+    }
+  | {
+      type: "risk_heuristic";
+      kind: "unauthorized_outgoing";
+      direction: "outgoing";
     };
 
 export interface MonitoringSkill {

@@ -8,6 +8,7 @@ export interface TransferCandidate {
   tokenSymbol?: string;
   contractInteraction?: boolean;
   contractType?: string;
+  counterpartyIsContract?: boolean;
   amountMnt: number;
   direction: "incoming" | "outgoing";
   recentTransactionCount?: number;
@@ -90,7 +91,12 @@ function evaluateAstPolicy(policy: PolicyRule, transfer: TransferCandidate, seen
   const shouldAlert = policy.ast?.logic === "OR" ? evaluations.some((item) => item.matched) : evaluations.every((item) => item.matched);
   const matched = evaluations.filter((item) => item.matched);
   const reasonCodes = [...new Set(matched.flatMap((item) => item.reasonCodes))];
-  const hasCriticalReason = reasonCodes.includes("TRANSACTION_FREQUENCY") || reasonCodes.includes("NEW_RECIPIENT") || reasonCodes.includes("KNOWN_CONTRACT_INTERACTION");
+  const hasCriticalReason =
+    reasonCodes.includes("TRANSACTION_FREQUENCY") ||
+    reasonCodes.includes("NEW_RECIPIENT") ||
+    reasonCodes.includes("KNOWN_CONTRACT_INTERACTION") ||
+    reasonCodes.includes("CONTRACT_COUNTERPARTY") ||
+    reasonCodes.includes("UNAUTHORIZED_OUTGOING_HEURISTIC");
 
   return {
     shouldAlert,
@@ -140,6 +146,24 @@ function evaluateCondition(
     return {
       matched,
       reasonCodes: matched ? ["NEW_RECIPIENT"] : [],
+    };
+  }
+
+  if (condition.type === "counterparty_kind") {
+    const matched = directionMatches(condition.direction, transfer.direction) && condition.kind === "contract" && Boolean(transfer.counterpartyIsContract || transfer.contractInteraction);
+    return {
+      matched,
+      reasonCodes: matched ? ["CONTRACT_COUNTERPARTY"] : [],
+    };
+  }
+
+  if (condition.type === "risk_heuristic") {
+    const matched =
+      transfer.direction === "outgoing" &&
+      (transfer.amountMnt > 0 || recipientFirstSeen || Boolean(transfer.contractInteraction) || Boolean(transfer.recentTransactionCount && transfer.recentTransactionCount > 1));
+    return {
+      matched,
+      reasonCodes: matched ? ["UNAUTHORIZED_OUTGOING_HEURISTIC"] : [],
     };
   }
 
